@@ -54,6 +54,7 @@ bower_components/
 
 ## Archivos secretos o de configuración local
 appsettings.Development.json
+appsettings.json
 appsettings.Local.json
 secrets.json
 
