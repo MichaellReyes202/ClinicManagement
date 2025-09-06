@@ -1,0 +1,66 @@
+## Archivos de compilación
+bin/
+obj/
+out/
+
+## Archivos de usuario
+*.user
+*.rsuser
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Configuración local
+.vs/
+.vscode/
+
+## Logs
+*.log
+
+## Archivos temporales
+*.tmp
+*.temp
+
+## Publicaciones
+.publish/
+.publish*
+/wwwroot/lib/
+
+## Archivos de paquetes
+*.nupkg
+*.snupkg
+*.nuspec
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Configuración de paquetes NuGet
+.nuget/
+packages/
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+
+## Archivos de dependencia
+node_modules/
+bower_components/
+
+## Archivos generados por IDEs
+*.dbmdl
+*.bak
+*.backup
+*.mdf
+*.ldf
+
+## Archivos secretos o de configuración local
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+
+## Archivos de sistema
+[Tt]humbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+## Archivos de publicación de IIS
+_PublishTemp/
