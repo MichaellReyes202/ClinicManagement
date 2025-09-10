@@ -4,14 +4,14 @@ using System.ComponentModel.DataAnnotations;
 // Contiene la información para registrar un nuevo usuario
 namespace Application.DTOs
 {
-    public class RegisterDto
+    public class RegisterDto : LoginDto
     {
         [Required]
         [EmailAddress]
         [MaxLength(length: 255)]
-        public required string Email { get; set; }
+        // valida que el email de confirmación sea igual al email
+        [Compare("Email", ErrorMessage = "The email and confirmation email do not match.")]
+        public required string ConfirmEmail { get; set; }
 
-        [Required]
-        public string Password { get; set; }
     }
 }

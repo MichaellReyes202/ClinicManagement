@@ -1,13 +1,15 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+﻿using Application.DTOs;
+using Application.Interfaces;
+using Domain.Entities;
+using Domain.Errors;
+using FluentValidation;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-using Domain.Entities;
-using Application.DTOs;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.AspNetCore.Http;
-using Application.Interfaces;
-using Microsoft.Extensions.Configuration;
 
 
 //  Implementa IAuthService. Contendrá la lógica para verificar
@@ -22,112 +24,167 @@ namespace Application.Services
         private readonly SignInManager<User> _signInManager;
         private readonly IHttpContextAccessor _contextAccessor;
         private readonly IConfiguration _configuration;
+        private readonly IValidator<LoginDto> _validatorLogin;
+        private readonly IValidator<RegisterDto> validatorRegister;
 
         public AuthService
         (
             UserManager<User> userManager,
             SignInManager<User> signInManager ,
             IHttpContextAccessor contextAccessor ,
-            IConfiguration configuration
+            IConfiguration configuration ,
+            IValidator<LoginDto> validator_login,
+            IValidator<RegisterDto> validatorRegister
         )
         {
             this._userManager = userManager;
             this._signInManager = signInManager;
             this._contextAccessor = contextAccessor;
             this._configuration = configuration;
+            this._validatorLogin = validator_login;
+            this.validatorRegister = validatorRegister;
         }
-        public async Task<AuthenticatedUserDto> RegisterAsync(RegisterDto registerDto)
+
+        public async Task<Result<AuthResponse>> LoginAsync(LoginDto loginDto)
         {
-            var user = new User
+            var validationResult = await _validatorLogin.ValidateAsync(loginDto);
+
+            if (!validationResult.IsValid)
             {
-                Email = registerDto.Email
-                // Set other properties as needed
-            };
+                var errors = validationResult.Errors
+                    .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
+                    .ToList();
+                return Result<AuthResponse>.Failure(errors);
+            }
+
+            var user = await _userManager.FindByNameAsync(loginDto.Email);
+            if (user is null)
+            {
+                return Result<AuthResponse>.Failure("Invalid credentials", "InvalidCredentials");
+            }
+
+            if (await _userManager.IsLockedOutAsync(user))
+            {
+                // Verificar si el bloqueo ha expirado
+                var lockoutEnd = await _userManager.GetLockoutEndDateAsync(user);
+                if (lockoutEnd.HasValue && lockoutEnd.Value <= DateTimeOffset.UtcNow)
+                {
+                    await _userManager.ResetAccessFailedCountAsync(user);
+                    await _userManager.SetLockoutEndDateAsync(user, null);
+                }
+            }
+
+            if (await _userManager.IsLockedOutAsync(user))
+            {
+                return Result<AuthResponse>.Failure("User account is locked out", "UserLockedOut");
+            }
+            var result = await _signInManager
+                .CheckPasswordSignInAsync(user, loginDto.Password,lockoutOnFailure: true);
+
+            if (result.Succeeded)
+            {
+                return Result<AuthResponse>.Success(await GenerateJwtTokenAsync(user.Email));
+            }
+            else
+            {
+                return Result<AuthResponse>.Failure("Invalid credentials", "InvalidCredentials");
+            }
+        }
+
+
+        public async Task<Result<AuthResponse>> RegisterAsync(RegisterDto registerDto)
+        {
+            var validationResult = await validatorRegister.ValidateAsync(registerDto);
+            if (!validationResult.IsValid)
+            {
+                var errors = validationResult.Errors
+                    .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
+                    .ToList();
+                return Result<AuthResponse>.Failure(errors);
+            }
+
+            // Verificar si el usuario ya existe
+            var existingUser = await _userManager.FindByEmailAsync(registerDto.Email);
+            if (existingUser != null)
+            {
+                return Result<AuthResponse>.Failure("User with this email already exists", "Email Exists");
+            }
+
+            var user = new User{ Email = registerDto.Email};
 
             var result = await _userManager.CreateAsync(user, registerDto.Password);
 
-            return 
-
-            //if (!result.Succeeded)
-            //{
-            //    var errors = result.Errors.Select(e => e.Description).ToList();
-            //    throw new InvalidOperationException(string.Join(", ", errors));
-            //}
-            //return await GenerateJwtTokenAsync(user);
-        }
-        public Task<string> LoginAsync(string email, string password)
-        {
-            throw new NotImplementedException();
-        }
-
-        public async Task<AuthenticatedUserDto> GenerateJwtTokenAsync(User user)
-        {
-            // Find the user by email using the UserManager
-            var userCreate = await _userManager.FindByEmailAsync(user.Email);
-
-            if (user == null)
+            if (result.Succeeded)
             {
-                throw new InvalidOperationException("User not found after registration.");
+                // Asignar el rol "User" al nuevo usuario
+                //await _userManager.AddToRoleAsync(user, "User");
+                var authResponse = await GenerateJwtTokenAsync(user.Email);
+                return Result<AuthResponse>.Success(authResponse);
+            }
+            else
+            {
+                var errors = result.Errors
+                    .Select(e => new ValidationError(string.Empty, e.Description))
+                    .ToList();
+                return Result<AuthResponse>.Failure(errors);
             }
 
-            var claims = new List<Claim>();
-            claims.Add(new Claim(ClaimTypes.Email, userCreate.Email!));
+        }
+       
+        public async Task<AuthResponse> GenerateJwtTokenAsync(string email)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(JwtRegisteredClaimNames.Sub, email),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new Claim(ClaimTypes.NameIdentifier, email)
+            };
 
+            // buscar al usuario por email 
+            User? user = await _userManager.FindByEmailAsync(email)
+                ?? throw new Exception("user not found");
 
-            // Get the user's roles through the UserManager, which delegates to your UserStore
+            // Obtener los roles del usuario 
             var roles = await _userManager.GetRolesAsync(user);
+            claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
-            // Add each role as a 'Role' claim
-            foreach (var rol in roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, rol));
-            }
+            var jwtSettings = _configuration.GetSection("JwtSettings");
 
-            // Configure the key and credentials for token signing
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JwtSettings:Key"]!));
+            // configuracion de la lleva y credenciales para la firma del token 
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var expiration = DateTime.UtcNow.AddDays(1);
 
             var tokenDeSeguridad = new JwtSecurityToken(
-                issuer: _configuration["JwtSettings:Issuer"],
-                audience: _configuration["JwtSettings:Audience"],
+                issuer: jwtSettings["Issuer"],
+                audience: jwtSettings["Audience"],
                 claims: claims,
                 expires: expiration,
                 signingCredentials: credentials
             );
-
             var token = new JwtSecurityTokenHandler().WriteToken(tokenDeSeguridad);
 
-            return new AuthenticatedUserDto
+            return new AuthResponse
             {
                 Token = token,
                 Expiration = expiration
             };
-            
         }
 
-        public Task<User?> GetCurrentUserAsync()
+        public async Task<User?> GetCurrentUserAsync()
         {
-            var emailClaim = _contextAccessor.HttpContext?
+            var emailClaim = _contextAccessor
+                .HttpContext!
                 .User
-                .Claims
-                .Where(x => x.Type == ClaimTypes.Email).FirstOrDefault();
-            if(emailClaim is  null)
+                .Claims.Where(x => x.Type == ClaimTypes.Email).FirstOrDefault();
+            if(emailClaim is null)
             {
                 return null;
             }
             var email = emailClaim.Value;
-            return _userManager.FindByEmailAsync(email);
+            return await _userManager.FindByEmailAsync(email);
         }
 
-        public Task<AuthenticatedUserDto> RegisterAsync(User user)
-        {
-            throw new NotImplementedException();
-        }
-
-        public Task<AuthenticatedUserDto> GenerateJwtTokenAsync(RegisterDto register)
-        {
-            throw new NotImplementedException();
-        }
+        
     }
 }

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 // Devuelve el resultado de una autenticación exitosa
 namespace Application.DTOs
 {
-    public class AuthenticatedUserDto
+    public class AuthResponse
     {
         public string Token { get; set; } = null!;
         public DateTime Expiration { get; set; }

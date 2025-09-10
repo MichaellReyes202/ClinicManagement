@@ -7,7 +7,14 @@ using System.Threading;
 
 namespace Infrastructure.Store
 {
-    public class UserStore : IUserStore<User> , IUserEmailStore<User>, IUserPasswordStore<User> , IUserRoleStore<User>
+    public class UserStore : 
+        IUserStore<User> , 
+        IUserPasswordStore<User> , 
+        IUserEmailStore<User>, 
+        IUserRoleStore<User> ,
+
+       IUserLockoutStore<User>
+
     {
         private readonly IUserRepository _userRepository;
         private readonly ILookupNormalizer _normalizer;
@@ -292,6 +299,47 @@ namespace Infrastructure.Store
             var users = await _roleRepository.GetUsersInRoleAsync(roleName);
 
             return users.ToList();
+        }
+
+
+
+        // ----------------- Lockout -----------------
+
+        public async Task<int> GetAccessFailedCountAsync(User user, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return await _userRepository.GetAccessFailedCountAsync(user);
+        }
+
+        public async Task<bool> GetLockoutEnabledAsync(User user, CancellationToken cancellationToken)
+        {
+            return await _userRepository.GetLockoutEnabledAsync(user);
+        }
+
+         public async Task<DateTimeOffset?> GetLockoutEndDateAsync(User user, CancellationToken cancellationToken)
+        {
+            return await _userRepository.GetLockoutEndDateAsync(user);
+        }
+
+        public async Task<int> IncrementAccessFailedCountAsync(User user, CancellationToken cancellationToken)
+        {
+            return await _userRepository.IncrementAccessFailedCountAsync(user);
+        }
+
+
+        public async Task ResetAccessFailedCountAsync(User user, CancellationToken cancellationToken)
+        {
+            await _userRepository.ResetAccessFailedCountAsync(user);
+        }
+
+        public async Task SetLockoutEnabledAsync(User user, bool enabled, CancellationToken cancellationToken)
+        {
+            await _userRepository.SetLockoutEnabledAsync(user, enabled);
+        }
+
+        public async Task SetLockoutEndDateAsync(User user, DateTimeOffset? lockoutEnd, CancellationToken cancellationToken)
+        {
+            await _userRepository.SetLockoutEndDateAsync(user, lockoutEnd);
         }
     }
 }

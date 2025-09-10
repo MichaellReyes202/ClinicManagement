@@ -25,6 +25,12 @@ public partial class User
 
     public DateTime? UpdatedAt { get; set; }
 
+    public bool? LockoutEnabled { get; set; }
+
+    public int  AccessFailedCount { get; set; } = 0;
+
+    public DateTime? LockoutEnd { get; set; }
+
     public virtual User? CreatedByUser { get; set; }
 
     public virtual ICollection<User> InverseCreatedByUser { get; set; } = new List<User>();

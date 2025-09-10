@@ -20,5 +20,14 @@ namespace Domain.Interfaces
         Task<User?> FindByEmailAsync(string normalizedEmail);
         Task<User?> FindByIdAsync(string userId);
 
+        // Métodos para lockout
+        Task<bool> GetLockoutEnabledAsync(User user);
+        Task SetLockoutEnabledAsync(User user, bool enabled);
+        Task<int> GetAccessFailedCountAsync(User user);
+        Task<int> IncrementAccessFailedCountAsync(User user);
+        Task ResetAccessFailedCountAsync(User user);
+        Task<DateTimeOffset?> GetLockoutEndDateAsync(User user);
+        Task SetLockoutEndDateAsync(User user, DateTimeOffset? lockoutEnd);
+
     }
 }

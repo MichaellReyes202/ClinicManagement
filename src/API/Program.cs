@@ -1,8 +1,11 @@
 ﻿
 using Application.Interfaces;
 using Application.Services;
+using Application.Validators;
 using Domain.Entities;
 using Domain.Interfaces;
+using FluentValidation;
+using FluentValidation.AspNetCore;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
 using Infrastructure.Store; 
@@ -32,8 +35,13 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
-
 builder.Services.AddHttpContextAccessor();
+
+
+// Registrar validadores de FluentValidation
+builder.Services.AddFluentValidationAutoValidation();
+builder.Services.AddValidatorsFromAssemblyContaining<LoginDtoValidator>(); // Escanea el ensamblado donde se encuentra LoginDtoValidator y registra automáticamente todos los validadores que encuentre.
+
 
 //builder.Services.AddTransient<SignInManager<User>>();
 //builder.Services.AddTransient<IUserStore<User>, UserStore>();
@@ -41,6 +49,10 @@ builder.Services.AddHttpContextAccessor();
 // configuracion de Identity
 builder.Services.AddIdentity<User , Role>(options =>
 {
+    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+    options.Lockout.MaxFailedAccessAttempts = 5;
+    options.Lockout.AllowedForNewUsers = true;
+
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;

@@ -17,31 +17,64 @@ namespace API.Controllers
         {
             this._authService = authService;
         }
-
+        
         [HttpPost("register")]
-        public async Task<ActionResult<AuthenticatedUserDto>> Register([FromBody] RegisterDto registerDto)
+        public async Task<ActionResult<AuthResponse>> Register( RegisterDto register)
         {
-            // Delegar la lógica de registro al servicio de autenticación
-            var response = await _authService.RegisterAsync(registerDto);
+            var result = await _authService.RegisterAsync(register);
+            if(result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+            if (result.ValidationErrors.Any())
+            {
+                // Agrupa los errores por el nombre de la propiedad
+                var errors = result.ValidationErrors
+                    .GroupBy(e => e.PropertyName)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(e => e.ErrorMessage).ToArray()
+                    );
 
+                // Devuelve una respuesta estructurada similar a ModelState
+                return BadRequest(new { errors = errors });
+            }
+            else
+            {
+                // Esto maneja errores de negocio (ej. "Credenciales inválidas")
+                return BadRequest(new { 
+                    code = result.ErrorCode,
+                    error = result.Error 
+                });
+            }
+        }
 
+        [HttpPost("login")]
+        public async Task<ActionResult<AuthResponse>> Login( LoginDto login)
+        {
+            var result = await _authService.LoginAsync(login);
 
-            // Retornar la respuesta exitosa
-            return Ok(response);
-            //try
-            //{
-               
-            //}
-            //catch (InvalidOperationException ex)
-            //{
-            //    // Capturar errores del servicio y devolver una respuesta de error
-            //    return BadRequest(new { message = ex.Message });
-            //}
-            //catch (Exception)
-            //{
-            //    // Manejar cualquier otro error inesperado
-            //    return StatusCode((int)HttpStatusCode.InternalServerError, "An unexpected error occurred.");
-            //}
+            if(result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+            if(result.ValidationErrors.Count != 0)
+            {
+                var validationErrors = result.ValidationErrors.ToDictionary(
+                    e => e.PropertyName,
+                    e => new[] { e.ErrorMessage }
+                );
+                return BadRequest(new { errors = validationErrors });
+            }
+            else
+            {
+                // Esto maneja errores de negocio (ej. "Credenciales inválidas")
+                return BadRequest(new
+                {
+                    code = result.ErrorCode,
+                    error = result.Error
+                });
+            }
         }
     }
 }

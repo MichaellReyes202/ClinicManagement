@@ -1,10 +1,6 @@
 ﻿using Application.DTOs;
 using Domain.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Domain.Errors;
 
 
 // Define la interfaz para los métodos de autenticación
@@ -12,14 +8,11 @@ namespace Application.Interfaces
 {
     public interface IAuthService
     {
-        Task<string> LoginAsync(string email, string password);
-        Task<AuthenticatedUserDto> RegisterAsync(User user);
+        Task<Result<AuthResponse>> LoginAsync(LoginDto loginDto);
+        Task<Result<AuthResponse>> RegisterAsync(RegisterDto registerDto);
 
         // metodo para generar token JWT
-        Task<AuthenticatedUserDto> GenerateJwtTokenAsync(RegisterDto register);
-
-        // metodo para obetner el usuario actual
-        Task<User?> GetCurrentUserAsync();
+        Task<AuthResponse> GenerateJwtTokenAsync(string email);
 
 
     }
