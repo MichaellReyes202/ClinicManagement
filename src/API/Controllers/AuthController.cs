@@ -1,7 +1,8 @@
 ﻿using Application.DTOs;
 using Application.Interfaces;
+using Domain.Errors;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Net;
 
 
 //  Contendrá los endpoints para Login y Register
@@ -17,64 +18,59 @@ namespace API.Controllers
         {
             this._authService = authService;
         }
-        
+
         [HttpPost("register")]
-        public async Task<ActionResult<AuthResponse>> Register( RegisterDto register)
+        [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+        public async Task<ActionResult<AuthResponse>> Register(RegisterDto register)
         {
             var result = await _authService.RegisterAsync(register);
-            if(result.IsSuccess)
+            if (result.IsFailure)
             {
-                return Ok(result.Value);
+                if (result.ValidationErrors.Count != 0)
+                {
+                    return BadRequest(result.ValidationErrors);
+                }
+                if (result.Error?.Code == ErrorCodes.BadRequest)
+                {
+                    return NotFound(new { result.Error, result.Error.Description });
+                }
+                if (result.Error?.Code == ErrorCodes.TooManyRequests)
+                {
+                    return StatusCode(429,new { result.Error, result.Error.Description });
+                }
+                if (result.Error?.Code == ErrorCodes.Conflict)
+                {
+                    return Conflict(new { result.Error, result.Error.Description });
+                }
             }
-            if (result.ValidationErrors.Any())
-            {
-                // Agrupa los errores por el nombre de la propiedad
-                var errors = result.ValidationErrors
-                    .GroupBy(e => e.PropertyName)
-                    .ToDictionary(
-                        g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()
-                    );
-
-                // Devuelve una respuesta estructurada similar a ModelState
-                return BadRequest(new { errors = errors });
-            }
-            else
-            {
-                // Esto maneja errores de negocio (ej. "Credenciales inválidas")
-                return BadRequest(new { 
-                    code = result.ErrorCode,
-                    error = result.Error 
-                });
-            }
+            return Ok(result.Value);
         }
 
         [HttpPost("login")]
-        public async Task<ActionResult<AuthResponse>> Login( LoginDto login)
+        [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<AuthResponse>> Login(LoginDto login)
         {
             var result = await _authService.LoginAsync(login);
-
-            if(result.IsSuccess)
+            if (result.IsFailure)
             {
-                return Ok(result.Value);
-            }
-            if(result.ValidationErrors.Count != 0)
-            {
-                var validationErrors = result.ValidationErrors.ToDictionary(
-                    e => e.PropertyName,
-                    e => new[] { e.ErrorMessage }
-                );
-                return BadRequest(new { errors = validationErrors });
-            }
-            else
-            {
-                // Esto maneja errores de negocio (ej. "Credenciales inválidas")
-                return BadRequest(new
+                if (result.ValidationErrors.Count != 0)
                 {
-                    code = result.ErrorCode,
-                    error = result.Error
-                });
+                    return BadRequest(result.ValidationErrors);
+                }
+                if (result.Error?.Code == ErrorCodes.Unauthorized)
+                {
+                    return Unauthorized(new { result.Error, result.Error.Description });
+                }
+                return StatusCode(500, new { result.Error, result.Error!.Description });
             }
+            return Ok(result.Value);
         }
     }
 }

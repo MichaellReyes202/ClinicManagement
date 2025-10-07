@@ -21,9 +21,9 @@ public partial class User
 
     public int? UpdatedByUserId { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 
     public bool? LockoutEnabled { get; set; }
 
@@ -32,6 +32,12 @@ public partial class User
     public DateTime? LockoutEnd { get; set; }
 
     public virtual User? CreatedByUser { get; set; }
+
+    public virtual ICollection<Employee> EmployeeCreatedByUsers { get; set; } = new List<Employee>();
+
+    public virtual ICollection<Employee> EmployeeUpdatedByUsers { get; set; } = new List<Employee>();
+
+    public virtual Employee? EmployeeUser { get; set; }
 
     public virtual ICollection<User> InverseCreatedByUser { get; set; } = new List<User>();
 

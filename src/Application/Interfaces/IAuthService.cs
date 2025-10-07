@@ -1,6 +1,6 @@
 ﻿using Application.DTOs;
-using Domain.Entities;
 using Domain.Errors;
+using Domain.Entities;
 
 
 // Define la interfaz para los métodos de autenticación
@@ -12,7 +12,7 @@ namespace Application.Interfaces
         Task<Result<AuthResponse>> RegisterAsync(RegisterDto registerDto);
 
         // metodo para generar token JWT
-        Task<AuthResponse> GenerateJwtTokenAsync(string email);
+        Task<AuthResponse> GenerateJwtTokenAsync(User user);
 
 
     }

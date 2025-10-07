@@ -15,18 +15,22 @@ namespace Infrastructure.Store
         public async Task<IdentityResult> CreateAsync(Role role, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (role == null) throw new ArgumentNullException(nameof(role));
+            ArgumentNullException.ThrowIfNull(role);
 
-            await _roleRepository.CreateAsync(role);
+            await _roleRepository.AddAsync(role);
+            await _roleRepository.SaveChangesAsync();
+
             return IdentityResult.Success;
         }
 
         public async Task<IdentityResult> UpdateAsync(Role role, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
             if (role == null) throw new ArgumentNullException(nameof(role));
 
             await _roleRepository.UpdateAsync(role);
+            await _roleRepository.SaveChangesAsync();
             return IdentityResult.Success;
         }
 
@@ -36,6 +40,7 @@ namespace Infrastructure.Store
             if (role == null) throw new ArgumentNullException(nameof(role));
 
             await _roleRepository.DeleteAsync(role);
+            await _roleRepository.SaveChangesAsync();
             return IdentityResult.Success;
         }
 
@@ -82,6 +87,7 @@ namespace Infrastructure.Store
             cancellationToken.ThrowIfCancellationRequested();
             return await _roleRepository.FindByNameAsync(normalizedRoleName);
         }
+
 
         public void Dispose()
         {

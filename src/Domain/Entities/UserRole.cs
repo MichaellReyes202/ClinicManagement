@@ -11,7 +11,7 @@ public partial class UserRole
 
     public int? CreatedByUserId { get; set; }
 
-    public DateTime? CreatedAt { get; set; }
+    public DateTime CreatedAt { get; set; }
 
     public virtual User? CreatedByUser { get; set; }
 

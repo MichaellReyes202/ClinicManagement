@@ -4,20 +4,20 @@ using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 namespace Infrastructure.Repositories
 {
-    public class RoleRepository : IRoleRepository
+    public class RoleRepository : GenericRepository<Role> ,  IRoleRepository
     {
         private readonly ClinicDbContext _context;
 
-        public RoleRepository(ClinicDbContext context)
+        public RoleRepository(ClinicDbContext context) : base(context)
         {
-            this._context = context;
+            _context = context;
         }
         public async Task<Role?> FindByNameAsync(string roleName)
         {
-            return await _context.Roles.FirstOrDefaultAsync(r => r.Name == roleName);
+            return await _context.Roles
+                .FirstOrDefaultAsync(r => r.Name.ToLower() == roleName.ToLower());
+            //return await ExistAsync(r => r.Name.ToLower() == roleName.ToLower())
         }
-
-
         public async Task<IList<string>> GetRolesAsync(User user)
         {
             var roles = await _context.UserRoles
@@ -25,10 +25,8 @@ namespace Infrastructure.Repositories
                 .Include(ur => ur.Role) // Asegúrate de cargar la entidad Role relacionada
                 .Select(ur => ur.Role.Name)
                 .ToListAsync();
-
             return roles;
         }
-
         public async Task<UserRole?> FindUserRoleAsync(int userId, int roleId)
         {
             return await _context.UserRoles
@@ -39,25 +37,23 @@ namespace Infrastructure.Repositories
         {
             if (int.TryParse(roleId, out int id))
             {
-                return await _context.Roles.FindAsync(id);
+                return await GetByIdAsync(id);
             }
             return null;
         }
+        
 
-        public async Task<bool> ExistsAsync(string roleName)
-        {
-            return await _context.Roles.AnyAsync(r => r.Name == roleName);
-        }
-
-        public async Task AddToRoleAsync(User user, Role role)
+        public Task AddToRoleAsync(User user, Role role , int userIdOnly)
         {
             var userRole = new UserRole
             {
                 UserId = user.Id,
-                RoleId = role.Id
+                RoleId = role.Id ,
+                CreatedByUserId = userIdOnly,
+                CreatedAt = DateTime.UtcNow
             };
             _context.UserRoles.Add(userRole);
-            await _context.SaveChangesAsync();
+            return Task.CompletedTask;
         }
 
         public async Task RemoveFromRoleAsync(User user, Role role)
@@ -66,7 +62,6 @@ namespace Infrastructure.Repositories
             if (userRole != null)
             {
                 _context.UserRoles.Remove(userRole);
-                await _context.SaveChangesAsync();
             }
         }
 
@@ -90,22 +85,16 @@ namespace Infrastructure.Repositories
             return users;
         }
 
-        public async Task CreateAsync(Role role)
-        {
-            _context.Roles.Add(role);
-            await _context.SaveChangesAsync();
-        }
+
 
         public async Task UpdateAsync(Role role)
         {
-            _context.Roles.Update(role);
-            await _context.SaveChangesAsync();
+            _context.Entry(role).State = EntityState.Modified;
         }
 
         public async Task DeleteAsync(Role role)
         {
             _context.Roles.Remove(role);
-            await _context.SaveChangesAsync();
         }
     }
 }

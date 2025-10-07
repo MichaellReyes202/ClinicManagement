@@ -1,5 +1,6 @@
 ﻿using Application.DTOs;
 using Application.Interfaces;
+using AutoMapper;
 using Domain.Entities;
 using Domain.Errors;
 using FluentValidation;
@@ -26,15 +27,17 @@ namespace Application.Services
         private readonly IConfiguration _configuration;
         private readonly IValidator<LoginDto> _validatorLogin;
         private readonly IValidator<RegisterDto> validatorRegister;
+        private readonly IMapper _mapper;
 
         public AuthService
         (
             UserManager<User> userManager,
-            SignInManager<User> signInManager ,
-            IHttpContextAccessor contextAccessor ,
-            IConfiguration configuration ,
+            SignInManager<User> signInManager,
+            IHttpContextAccessor contextAccessor,
+            IConfiguration configuration,
             IValidator<LoginDto> validator_login,
-            IValidator<RegisterDto> validatorRegister
+            IValidator<RegisterDto> validatorRegister,
+            IMapper mapper
         )
         {
             this._userManager = userManager;
@@ -43,6 +46,7 @@ namespace Application.Services
             this._configuration = configuration;
             this._validatorLogin = validator_login;
             this.validatorRegister = validatorRegister;
+            _mapper = mapper;
         }
 
         public async Task<Result<AuthResponse>> LoginAsync(LoginDto loginDto)
@@ -60,7 +64,7 @@ namespace Application.Services
             var user = await _userManager.FindByNameAsync(loginDto.Email);
             if (user is null)
             {
-                return Result<AuthResponse>.Failure("Invalid credentials", "InvalidCredentials");
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.BadRequest , "Invalid Credentials"));
             }
 
             if (await _userManager.IsLockedOutAsync(user))
@@ -76,19 +80,16 @@ namespace Application.Services
 
             if (await _userManager.IsLockedOutAsync(user))
             {
-                return Result<AuthResponse>.Failure("User account is locked out", "UserLockedOut");
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.TooManyRequests, "User account is locked. Please try again later."));
             }
             var result = await _signInManager
-                .CheckPasswordSignInAsync(user, loginDto.Password,lockoutOnFailure: true);
+                .CheckPasswordSignInAsync(user, loginDto.Password, lockoutOnFailure: true);
 
-            if (result.Succeeded)
+            if (!result.Succeeded)
             {
-                return Result<AuthResponse>.Success(await GenerateJwtTokenAsync(user.Email));
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.BadRequest, "Invalid Credentials"));
             }
-            else
-            {
-                return Result<AuthResponse>.Failure("Invalid credentials", "InvalidCredentials");
-            }
+            return Result<AuthResponse>.Success(await GenerateJwtTokenAsync(user));
         }
 
 
@@ -107,18 +108,16 @@ namespace Application.Services
             var existingUser = await _userManager.FindByEmailAsync(registerDto.Email);
             if (existingUser != null)
             {
-                return Result<AuthResponse>.Failure("User with this email already exists", "Email Exists");
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.Conflict, "User with this email already exists."));
             }
-
-            var user = new User{ Email = registerDto.Email};
-
+            var user = _mapper.Map<User>(registerDto);
             var result = await _userManager.CreateAsync(user, registerDto.Password);
 
             if (result.Succeeded)
             {
                 // Asignar el rol "User" al nuevo usuario
-                //await _userManager.AddToRoleAsync(user, "User");
-                var authResponse = await GenerateJwtTokenAsync(user.Email);
+                await _userManager.AddToRoleAsync(user, "User");
+                var authResponse = await GenerateJwtTokenAsync(existingUser!);
                 return Result<AuthResponse>.Success(authResponse);
             }
             else
@@ -130,22 +129,17 @@ namespace Application.Services
             }
 
         }
-       
-        public async Task<AuthResponse> GenerateJwtTokenAsync(string email)
+
+        public async Task<AuthResponse> GenerateJwtTokenAsync(User user)
         {
             var claims = new List<Claim>
             {
-                new Claim(JwtRegisteredClaimNames.Sub, email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, email)
-            };
-
-            // buscar al usuario por email 
-            User? user = await _userManager.FindByEmailAsync(email)
-                ?? throw new Exception("user not found");
-
-            // Obtener los roles del usuario 
+                new(ClaimTypes.Email, user.Email),
+                new(JwtRegisteredClaimNames.Sub , user.Email),
+                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            }; 
             var roles = await _userManager.GetRolesAsync(user);
+
             claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
             var jwtSettings = _configuration.GetSection("JwtSettings");
@@ -156,18 +150,19 @@ namespace Application.Services
             var expiration = DateTime.UtcNow.AddDays(1);
 
             var tokenDeSeguridad = new JwtSecurityToken(
-                issuer: jwtSettings["Issuer"],
-                audience: jwtSettings["Audience"],
-                claims: claims,
-                expires: expiration,
-                signingCredentials: credentials
-            );
+                 issuer: null ,// jwtSettings["Issuer"],
+                 audience: null, // jwtSettings["Audience"],
+                 claims: claims,
+                 expires: expiration,
+                 signingCredentials: credentials
+             );
             var token = new JwtSecurityTokenHandler().WriteToken(tokenDeSeguridad);
 
             return new AuthResponse
             {
                 Token = token,
-                Expiration = expiration
+                Expiration = expiration,
+                Roles = roles.ToList()
             };
         }
 
@@ -177,7 +172,7 @@ namespace Application.Services
                 .HttpContext!
                 .User
                 .Claims.Where(x => x.Type == ClaimTypes.Email).FirstOrDefault();
-            if(emailClaim is null)
+            if (emailClaim is null)
             {
                 return null;
             }
@@ -185,6 +180,6 @@ namespace Application.Services
             return await _userManager.FindByEmailAsync(email);
         }
 
-        
+
     }
 }

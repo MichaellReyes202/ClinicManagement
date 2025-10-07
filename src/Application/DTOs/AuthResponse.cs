@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-// Devuelve el resultado de una autenticación exitosa
+﻿// Devuelve el resultado de una autenticación exitosa
 namespace Application.DTOs
 {
     public class AuthResponse
     {
         public string Token { get; set; } = null!;
         public DateTime Expiration { get; set; }
+
+        // Lista de roles del usuario
+        public List<string> Roles { get; set; } = new();
     }
 }

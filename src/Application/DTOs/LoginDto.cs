@@ -9,8 +9,8 @@ namespace Application.DTOs
     {
         [Required]
         [EmailAddress]
-        [MaxLength(255 , ErrorMessage = "El correo excede la cantidad de caracteres ")]
-        public required string Email { get; set; } =  string.Empty;
+        [MaxLength(255, ErrorMessage = "El correo excede la cantidad de caracteres ")]
+        public required string Email { get; set; } = string.Empty;
         [Required]
         [MinLength(6)]
         public required string Password { get; set; }

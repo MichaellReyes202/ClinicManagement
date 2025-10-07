@@ -2,16 +2,14 @@
 using Domain.Entities;
 using Domain.Interfaces;
 using Microsoft.AspNetCore.Identity;
-using System.Security.Claims;
-using System.Threading;
 
 namespace Infrastructure.Store
 {
-    public class UserStore : 
-        IUserStore<User> , 
-        IUserPasswordStore<User> , 
-        IUserEmailStore<User>, 
-        IUserRoleStore<User> ,
+    public class UserStore :
+        IUserStore<User>,
+        IUserPasswordStore<User>,
+        IUserEmailStore<User>,
+        IUserRoleStore<User>,
 
        IUserLockoutStore<User>
 
@@ -22,9 +20,9 @@ namespace Infrastructure.Store
 
         public UserStore
         (
-            IUserRepository userRepository , 
-            ILookupNormalizer normalizer ,
-            IRoleRepository roleRepository
+            IUserRepository userRepository,
+            ILookupNormalizer normalizer,
+            IRoleRepository roleRepository 
         )
         {
             this._userRepository = userRepository;
@@ -35,12 +33,14 @@ namespace Infrastructure.Store
         {
             cancellationToken.ThrowIfCancellationRequested();
             await _userRepository.AddAsync(user);
+            await _userRepository.SaveChangesAsync();
             return IdentityResult.Success;
         }
         public async Task<IdentityResult> DeleteAsync(User user, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await _userRepository.DeleteAsync(user);
+            await _userRepository.SaveChangesAsync();
             return IdentityResult.Success;
         }
         public async Task<User?> FindByIdAsync(string userId, CancellationToken cancellationToken)
@@ -74,8 +74,8 @@ namespace Infrastructure.Store
 
             return await Task.FromResult(user.Id.ToString());
         }
-        
-        public  Task SetUserNameAsync(User user, string? userName, CancellationToken cancellationToken)
+
+        public Task SetUserNameAsync(User user, string? userName, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (user == null)
@@ -95,6 +95,7 @@ namespace Infrastructure.Store
         {
             cancellationToken.ThrowIfCancellationRequested();
             await _userRepository.UpdateAsync(user);
+            await _userRepository.SaveChangesAsync();
             return IdentityResult.Success;
         }
         public Task<string?> GetUserNameAsync(User user, CancellationToken cancellationToken)
@@ -115,14 +116,14 @@ namespace Infrastructure.Store
             // Los repositorios se gestionan por el contenedor de inyección de dependencias de .NET Core,
             // que se encarga de su ciclo de vida. No es necesario liberar recursos aquí manualmente.
         }
-        
+
 
         public async Task<User?> FindByEmailAsync(string normalizedEmail, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return await _userRepository.FindByEmailAsync(normalizedEmail);
         }
-        public  Task<string?> GetEmailAsync(User user, CancellationToken cancellationToken)
+        public Task<string?> GetEmailAsync(User user, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -244,6 +245,8 @@ namespace Infrastructure.Store
         }
 
 
+
+
         // ----------------- Roles -----------------
         public async Task AddToRoleAsync(User user, string roleName, CancellationToken cancellationToken)
         {
@@ -257,8 +260,10 @@ namespace Infrastructure.Store
             {
                 throw new InvalidOperationException($"Role {roleName} not found.");
             }
+            var userOnly = await _userRepository.FindByIdAsync(user.Id.ToString()) ?? throw new InvalidOperationException($"User with ID {user.Id} not found.");
+            await _roleRepository.AddToRoleAsync(user, role , userOnly.Id);
+            await _userRepository.SaveChangesAsync();
 
-            await _roleRepository.AddToRoleAsync(user, role);
         }
 
         public async Task RemoveFromRoleAsync(User user, string roleName, CancellationToken cancellationToken)
@@ -272,6 +277,7 @@ namespace Infrastructure.Store
             if (role == null) return; // Si el rol no existe, no hay nada que remover.
 
             await _roleRepository.RemoveFromRoleAsync(user, role);
+            await _userRepository.SaveChangesAsync();
         }
 
         public async Task<IList<string>> GetRolesAsync(User user, CancellationToken cancellationToken)
@@ -316,7 +322,7 @@ namespace Infrastructure.Store
             return await _userRepository.GetLockoutEnabledAsync(user);
         }
 
-         public async Task<DateTimeOffset?> GetLockoutEndDateAsync(User user, CancellationToken cancellationToken)
+        public async Task<DateTimeOffset?> GetLockoutEndDateAsync(User user, CancellationToken cancellationToken)
         {
             return await _userRepository.GetLockoutEndDateAsync(user);
         }
