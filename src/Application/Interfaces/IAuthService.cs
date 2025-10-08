@@ -9,7 +9,7 @@ namespace Application.Interfaces
     public interface IAuthService
     {
         Task<Result<AuthResponse>> LoginAsync(LoginDto loginDto);
-        Task<Result<AuthResponse>> RegisterAsync(RegisterDto registerDto);
+        Task<Result<UserDto>> RegisterAsync(RegisterDto registerDto);
 
         // metodo para generar token JWT
         Task<AuthResponse> GenerateJwtTokenAsync(User user);

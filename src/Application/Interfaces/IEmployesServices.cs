@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Application.DTOs;
+using Domain.Entities;
+using Domain.Errors;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,5 +11,6 @@ namespace Application.Interfaces
 {
     public interface IEmployesServices
     {
+        Task<Result<EmployesReponseDto>> AddSpecialtyAsync(EmployesCreationDto specialtiesDto);
     }
 }

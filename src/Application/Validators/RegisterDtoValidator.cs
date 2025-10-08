@@ -7,12 +7,11 @@ namespace Application.Validators
     {
         public RegisterDtoValidator()
         {
-            // Esto aplica automáticamente las validaciones de LoginDto
-            Include(new LoginDtoValidator());
+            RuleFor(x => x.EmployeeId)
+                .GreaterThan(0).WithMessage("EmployeeId must be greater than 0.");
+            RuleFor(x => x.RoleId)
+                .GreaterThan(0).WithMessage("RoleId must be greater than 0.");
 
-            RuleFor(x => x.Password)
-                .NotEmpty().WithMessage("La contraseña es obligatoria")
-                .MinimumLength(6).WithMessage("La contraseña debe tener al menos 6 caracteres");
         }
     }
 }

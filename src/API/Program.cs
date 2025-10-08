@@ -22,7 +22,13 @@ using System.Text.Json.Serialization;
 var builder = WebApplication.CreateBuilder(args);
 
 // Agregar servicios al contenedor
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // Ignora los ciclos de referencia
+        options.JsonSerializerOptions.ReferenceHandler =
+            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
 
 // Configurar DbContext con PostgreSQL
 builder.Services.AddDbContext<ClinicDbContext>(options =>
@@ -39,11 +45,11 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IRoleService, RoleServices>();   
 builder.Services.AddScoped<IUserService, UserService>();
-
-
+builder.Services.AddScoped<IEmployesServices, EmployesServices>();
 builder.Services.AddScoped<ISpecialtiesServices, SpecialtiesServices>();
 builder.Services.AddScoped<ISpecialtiesRepository, SpecialtiesRepository>();
 builder.Services.AddScoped<IEmployesRepository, EmployesRepository>();
+builder.Services.AddScoped<IPositionRepository, PositionRepository>();
 
 builder.Services.AddHttpContextAccessor();
 
@@ -72,6 +78,8 @@ builder.Services.AddIdentity<User, Role>(options =>
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequiredLength = 6;
     options.User.RequireUniqueEmail = true;
+
+    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
 })
 //.AddErrorDescriber<>()
 .AddDefaultTokenProviders() // // Esto es necesario para que Identity pueda generar tokens de autenticaci�n, como los de restablecimiento de contrase�a o verificaci�n de correo electr�nico.

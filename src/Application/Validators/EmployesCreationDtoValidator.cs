@@ -28,6 +28,10 @@ namespace Application.Validators
                 .MaximumLength(100).WithMessage("Second last name must not exceed 100 characters.")
                 .When(x => !string.IsNullOrWhiteSpace(x.SecondLastName));
 
+            // Age
+            RuleFor(x => x.Age)
+                .InclusiveBetween(18, 65).WithMessage("Age must be between 18 and 65.");
+
             // PositionId
             RuleFor(x => x.PositionId)
                 .NotNull().WithMessage("Position is required.")
@@ -35,20 +39,22 @@ namespace Application.Validators
 
             // ContactPhone
             RuleFor(x => x.ContactPhone)
-                .Matches(@"^[0-9+\-\s]+$").WithMessage("Contact phone can only contain numbers, spaces, and + or - signs.")
-                .MaximumLength(50).WithMessage("Contact phone must not exceed 50 characters.")
-                .When(x => !string.IsNullOrWhiteSpace(x.ContactPhone));
+            .NotEmpty()
+            .MaximumLength(8) // Opcional pero buena práctica
+            .MinimumLength(8) // Opcional pero buena práctica
+            .Matches(@"^[1-9]\d{7}$")
+            .WithMessage("Contact phone must be exactly 8 digits long and cannot start with zero (0).");
 
             // HireDate
             RuleFor(x => x.HireDate)
-        .NotEmpty().WithMessage("Hire date is required.")
-        .LessThanOrEqualTo(DateTime.Now).WithMessage("Hire date cannot be in the future.");
+            .NotEmpty().WithMessage("Hire date is required.")
+            .LessThanOrEqualTo(DateTime.Now).WithMessage("Hire date cannot be in the future.");
 
 
             // Dni (Nicaraguan ID)
             RuleFor(x => x.Dni)    //                                                                          401-101198-1003A
                 .Matches(@"^\d{3}-\d{6}-\d{4}[A-Z]$").WithMessage("DNI must follow the Nicaraguan format (e.g. 001-010101-0000A).")
-                .MaximumLength(14).WithMessage("\r\nDNI cannot be more than 16 characters (including hyphens)")
+                .MaximumLength(16).WithMessage("\r\nDNI cannot be more than 16 characters (including hyphens)")
                 .When(x => !string.IsNullOrWhiteSpace(x.Dni));
 
             // SpecialtyId

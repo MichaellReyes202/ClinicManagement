@@ -4,9 +4,9 @@ using System.ComponentModel.DataAnnotations;
 // Contiene la información para registrar un nuevo usuario
 namespace Application.DTOs
 {
-    public class RegisterDto : LoginDto
+    public class RegisterDto 
     {
-        public required string ConfirmEmail { get; set; }
-
+        public int EmployeeId { get; set; }
+        public int RoleId { get; set; }
     }
 }

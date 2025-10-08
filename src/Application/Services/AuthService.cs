@@ -1,8 +1,10 @@
 ﻿using Application.DTOs;
 using Application.Interfaces;
+using Application.Util;
 using AutoMapper;
 using Domain.Entities;
 using Domain.Errors;
+using Domain.Interfaces;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -28,6 +30,8 @@ namespace Application.Services
         private readonly IValidator<LoginDto> _validatorLogin;
         private readonly IValidator<RegisterDto> validatorRegister;
         private readonly IMapper _mapper;
+        private readonly IEmployesRepository _employesRepository;
+        private readonly IRoleRepository _roleRepository;
 
         public AuthService
         (
@@ -37,7 +41,11 @@ namespace Application.Services
             IConfiguration configuration,
             IValidator<LoginDto> validator_login,
             IValidator<RegisterDto> validatorRegister,
-            IMapper mapper
+            IMapper mapper , 
+            IEmployesRepository employesRepository ,
+            IRoleRepository roleRepository
+
+
         )
         {
             this._userManager = userManager;
@@ -47,6 +55,8 @@ namespace Application.Services
             this._validatorLogin = validator_login;
             this.validatorRegister = validatorRegister;
             _mapper = mapper;
+            _employesRepository = employesRepository;
+            _roleRepository = roleRepository;
         }
 
         public async Task<Result<AuthResponse>> LoginAsync(LoginDto loginDto)
@@ -93,7 +103,7 @@ namespace Application.Services
         }
 
 
-        public async Task<Result<AuthResponse>> RegisterAsync(RegisterDto registerDto)
+        public async Task<Result<UserDto>> RegisterAsync(RegisterDto registerDto)
         {
             var validationResult = await validatorRegister.ValidateAsync(registerDto);
             if (!validationResult.IsValid)
@@ -101,33 +111,57 @@ namespace Application.Services
                 var errors = validationResult.Errors
                     .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
                     .ToList();
-                return Result<AuthResponse>.Failure(errors);
+                return Result<UserDto>.Failure(errors);
             }
-
-            // Verificar si el usuario ya existe
-            var existingUser = await _userManager.FindByEmailAsync(registerDto.Email);
-            if (existingUser != null)
+            using var transaction = await _employesRepository.BeginTransactionAsync();
+            try
             {
-                return Result<AuthResponse>.Failure(new Error(ErrorCodes.Conflict, "User with this email already exists."));
-            }
-            var user = _mapper.Map<User>(registerDto);
-            var result = await _userManager.CreateAsync(user, registerDto.Password);
+                var employe = await _employesRepository.GetByIdAsync(registerDto.EmployeeId);
+                if (employe is null)
+                    return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The employee with ID '{registerDto.EmployeeId}' does not exist."));
+                if (employe.UserId.HasValue && employe.UserId.Value > 0)
+                    return Result<UserDto>.Failure(new Error(ErrorCodes.Conflict, "The employee already has an associated user account."));
+                var role = await _roleRepository.GetByIdAsync(registerDto.RoleId);
+                if (role is null)
+                {
+                    return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The role with ID '{registerDto.RoleId}' does not exist."));
+                }
+                var emailGenerator = RemoveDiacritics.Remove( $"{employe.FirstName.ToLower()}.{employe.LastName.ToLower()}{employe.Id}@oficentro.com");
+                var initialPassword = PasswordGenerator.GenerateTemporaryPassword();
 
-            if (result.Succeeded)
-            {
-                // Asignar el rol "User" al nuevo usuario
-                await _userManager.AddToRoleAsync(user, "User");
-                var authResponse = await GenerateJwtTokenAsync(existingUser!);
-                return Result<AuthResponse>.Success(authResponse);
-            }
-            else
-            {
-                var errors = result.Errors
-                    .Select(e => new ValidationError(string.Empty, e.Description))
-                    .ToList();
-                return Result<AuthResponse>.Failure(errors);
-            }
+                var userDto = new UserDto
+                {
+                    Email = emailGenerator,
+                    Password = initialPassword,
+                };
+                var user = _mapper.Map<User>(new UserDto() { Email = emailGenerator });
+                var result = await _userManager.CreateAsync(user, initialPassword);
 
+                if (result.Succeeded)
+                {
+                    var existingUser = await _userManager.FindByEmailAsync(emailGenerator);
+                    employe.UserId = existingUser!.Id;
+                    await _employesRepository.UpdateEmployeeAsync(employe);
+                    await _userManager.AddToRoleAsync(user, role.Name);
+                    await _employesRepository.SaveChangesAsync();
+
+                    await transaction.CommitAsync();
+                    return Result<UserDto>.Success(userDto);
+                }
+                else
+                {
+                    var errors = result.Errors
+                        .Select(e => new ValidationError(string.Empty, e.Description))
+                        .ToList();
+                    return Result<UserDto>.Failure(errors);
+                }
+
+            }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                return Result<UserDto>.Failure(new Error(ErrorCodes.Unexpected, ex.Message));
+            }
         }
 
         public async Task<AuthResponse> GenerateJwtTokenAsync(User user)
@@ -141,10 +175,7 @@ namespace Application.Services
             var roles = await _userManager.GetRolesAsync(user);
 
             claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
-
             var jwtSettings = _configuration.GetSection("JwtSettings");
-
-            // configuracion de la lleva y credenciales para la firma del token 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
             var expiration = DateTime.UtcNow.AddDays(1);
@@ -162,24 +193,15 @@ namespace Application.Services
             {
                 Token = token,
                 Expiration = expiration,
-                Roles = roles.ToList()
+                User = new UserInfo
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    FullName = $"{user.EmployeeUser?.FirstName} {user.EmployeeUser?.LastName}",
+                    IsActive = user.IsActive ?? false,
+                    Roles = [.. roles]
+                }
             };
         }
-
-        public async Task<User?> GetCurrentUserAsync()
-        {
-            var emailClaim = _contextAccessor
-                .HttpContext!
-                .User
-                .Claims.Where(x => x.Type == ClaimTypes.Email).FirstOrDefault();
-            if (emailClaim is null)
-            {
-                return null;
-            }
-            var email = emailClaim.Value;
-            return await _userManager.FindByEmailAsync(email);
-        }
-
-
     }
 }

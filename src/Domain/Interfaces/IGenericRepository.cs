@@ -16,8 +16,5 @@ namespace Domain.Interfaces
 
         Task CommitAsync();
         Task RollbackAsync();
-
-
-
     }
 }

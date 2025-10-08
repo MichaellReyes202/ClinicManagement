@@ -20,6 +20,7 @@ namespace API.Controllers
         }
 
         [HttpPost("register")]
+        [Authorize(Policy = "AdminOnly")]
         [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -16,7 +16,6 @@ namespace Infrastructure.Repositories
         {
             return await _context.Roles
                 .FirstOrDefaultAsync(r => r.Name.ToLower() == roleName.ToLower());
-            //return await ExistAsync(r => r.Name.ToLower() == roleName.ToLower())
         }
         public async Task<IList<string>> GetRolesAsync(User user)
         {

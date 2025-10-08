@@ -12,6 +12,8 @@ namespace Application.DTOs
         public string? MiddleName { get; set; }
         public required string LastName { get; set; } = null!;
         public string? SecondLastName { get; set; }
+        public required int Age { get; set; }
+
         public required int PositionId { get; set; } // Cargo que ocupa el empleado
         public string? ContactPhone { get; set; }
         public DateTime HireDate { get; set; } // Fecha de contratación
