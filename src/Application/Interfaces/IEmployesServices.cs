@@ -11,6 +11,8 @@ namespace Application.Interfaces
 {
     public interface IEmployesServices
     {
-        Task<Result<EmployesReponseDto>> AddSpecialtyAsync(EmployesCreationDto specialtiesDto);
+        Task<Result<EmployeReponseDto>> AddSpecialtyAsync(EmployesCreationDto specialtiesDto);
+        Task<Result<PaginatedResponseDto<EmployeeListDTO>>> GetAllEmployes(PaginationDto pagination);
+        Task<Result<EmployeReponseDto>> GetEmployeeById(int Id);
     }
 }

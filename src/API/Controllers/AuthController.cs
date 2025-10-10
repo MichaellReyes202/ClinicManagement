@@ -52,6 +52,7 @@ namespace API.Controllers
         }
 
         [HttpPost("login")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -59,19 +60,23 @@ namespace API.Controllers
         public async Task<ActionResult<AuthResponse>> Login(LoginDto login)
         {
             var result = await _authService.LoginAsync(login);
-            if (result.IsFailure)
+            if(result.IsSuccess)
             {
-                if (result.ValidationErrors.Count != 0)
-                {
-                    return BadRequest(result.ValidationErrors);
-                }
-                if (result.Error?.Code == ErrorCodes.Unauthorized)
-                {
-                    return Unauthorized(new { result.Error, result.Error.Description });
-                }
-                return StatusCode(500, new { result.Error, result.Error!.Description });
+                return Ok(result.Value);
             }
-            return Ok(result.Value);
+            if(result.ValidationErrors.Count != 0)
+            {
+                return BadRequest(result.ValidationErrors);
+            }
+            if(result.Error?.Code == ErrorCodes.BadRequest)
+            {
+                return BadRequest(new { result.Error, result.Error.Description });
+            }
+            if(result.Error?.Code == ErrorCodes.TooManyRequests)
+            {
+                return StatusCode(429, new { result.Error, result.Error.Description });
+            }
+            return StatusCode(500, new { result.Error, result.Error.Description });
         }
     }
 }

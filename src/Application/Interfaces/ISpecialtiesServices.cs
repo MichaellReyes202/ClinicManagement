@@ -12,6 +12,7 @@ namespace Application.Interfaces
     public interface ISpecialtiesServices
     {
         Task<Result<Specialty>> AddSpecialtyAsync(SpecialtiesDto specialtiesDto);
+        Task<List<OptionDto>> GetAllSpecialtiesOptions();
         Task<Result<Specialty>> GetByIdAsync(int id);
         Task<Result<Specialty>> UpdateSpecialtyAsync(int id, SpecialtiesDto specialtiesDto);
     }

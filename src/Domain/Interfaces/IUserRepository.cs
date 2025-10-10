@@ -23,5 +23,8 @@ namespace Domain.Interfaces
         Task<DateTimeOffset?> GetLockoutEndDateAsync(User user);
         Task SetLockoutEndDateAsync(User user, DateTimeOffset? lockoutEnd);
 
+        // metodo para obteener el usuario con con el empleado relacionado
+        Task<User?> GetUserWithEmployeeByEmailAsync(string email);
+
     }
 }

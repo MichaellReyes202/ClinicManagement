@@ -17,6 +17,48 @@ namespace API.Controllers
         {
             _employesServices = employesServices;
         }
+
+
+        // obtener el empleador por el id 
+        [HttpGet("{id:int}", Name = "GetEmployee")]
+        public async Task<ActionResult<EmployeReponseDto>> Get(int Id)
+        {
+            var result = await _employesServices.GetEmployeeById(Id);
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+            if (result.Error?.Code == ErrorCodes.NotFound)
+            {
+                return NotFound(result.Error);
+            }
+            if (result.Error?.Code == ErrorCodes.BadRequest)
+            {
+                return BadRequest(result.Error);
+            }
+            return BadRequest(result.Error);
+
+        }
+
+        [HttpGet]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public async Task<IActionResult> Get([FromQuery] PaginationDto pagination)
+        {
+            var result = await _employesServices.GetAllEmployes(pagination);
+            if (result.IsSuccess)
+            {
+                return Ok(new
+                {
+                    count = result.Value?.Count,
+                    pages = result.Value?.Pages,
+                    EmployeeListDto = result.Value?.Items
+                });
+            }
+            return BadRequest(result.Error);
+        }
+
+
         [HttpPost("createEmployes")]
         [Authorize]
         [ProducesResponseType( StatusCodes.Status200OK)]

@@ -32,6 +32,7 @@ namespace Application.Services
         private readonly IMapper _mapper;
         private readonly IEmployesRepository _employesRepository;
         private readonly IRoleRepository _roleRepository;
+        private readonly IUserRepository _userRepository;
 
         public AuthService
         (
@@ -43,7 +44,8 @@ namespace Application.Services
             IValidator<RegisterDto> validatorRegister,
             IMapper mapper , 
             IEmployesRepository employesRepository ,
-            IRoleRepository roleRepository
+            IRoleRepository roleRepository ,
+            IUserRepository userRepository
 
 
         )
@@ -57,6 +59,7 @@ namespace Application.Services
             _mapper = mapper;
             _employesRepository = employesRepository;
             _roleRepository = roleRepository;
+            _userRepository = userRepository;
         }
 
         public async Task<Result<AuthResponse>> LoginAsync(LoginDto loginDto)
@@ -71,35 +74,49 @@ namespace Application.Services
                 return Result<AuthResponse>.Failure(errors);
             }
 
-            var user = await _userManager.FindByNameAsync(loginDto.Email);
+            var user = await _userRepository.GetUserWithEmployeeByEmailAsync(loginDto.Email);
             if (user is null)
-            {
                 return Result<AuthResponse>.Failure(new Error(ErrorCodes.BadRequest , "Invalid Credentials"));
-            }
 
             if (await _userManager.IsLockedOutAsync(user))
             {
-                // Verificar si el bloqueo ha expirado
                 var lockoutEnd = await _userManager.GetLockoutEndDateAsync(user);
                 if (lockoutEnd.HasValue && lockoutEnd.Value <= DateTimeOffset.UtcNow)
                 {
                     await _userManager.ResetAccessFailedCountAsync(user);
                     await _userManager.SetLockoutEndDateAsync(user, null);
                 }
+                else
+                {
+                    return Result<AuthResponse>.Failure(new Error(ErrorCodes.TooManyRequests, "User account is locked. Please try again later."));
+                }
             }
 
             if (await _userManager.IsLockedOutAsync(user))
-            {
                 return Result<AuthResponse>.Failure(new Error(ErrorCodes.TooManyRequests, "User account is locked. Please try again later."));
-            }
+
             var result = await _signInManager
                 .CheckPasswordSignInAsync(user, loginDto.Password, lockoutOnFailure: true);
-
+            
+            if(result.IsLockedOut)
+            {
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.TooManyRequests, "User account is locked due to multiple failed login attempts. Please try again later."));
+            }   
+            if( result.IsNotAllowed)
+            {
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "User is not allowed to sign in. Please contact support."));
+            }
             if (!result.Succeeded)
             {
                 return Result<AuthResponse>.Failure(new Error(ErrorCodes.BadRequest, "Invalid Credentials"));
             }
-            return Result<AuthResponse>.Success(await GenerateJwtTokenAsync(user));
+            else
+            {
+                return Result<AuthResponse>.Success(await GenerateJwtTokenAsync(user));
+            }
+                
+
+
         }
 
 

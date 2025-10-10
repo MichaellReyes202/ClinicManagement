@@ -16,7 +16,17 @@ namespace API.Controllers
         {
             _specialtiesServices = specialtiesServices;
         }
-        [HttpPost]
+
+
+        [HttpGet("listOption")]
+        public async Task<ActionResult<List<OptionDto>>> GetListOption()
+        {
+            return await _specialtiesServices.GetAllSpecialtiesOptions();
+        }
+
+
+
+        [HttpPost("create")]
         [ProducesResponseType(typeof(Specialty), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]

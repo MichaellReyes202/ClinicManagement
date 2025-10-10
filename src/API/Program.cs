@@ -11,12 +11,11 @@ using Infrastructure.Persistence;
 using Infrastructure.Repositories;
 using Infrastructure.Store;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
-using System.Text.Json.Serialization;
+
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,12 +27,29 @@ builder.Services.AddControllers()
         // Ignora los ciclos de referencia
         options.JsonSerializerOptions.ReferenceHandler =
             System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
     });
 
 // Configurar DbContext con PostgreSQL
 builder.Services.AddDbContext<ClinicDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+});
+
+
+// ======================================================
+// 1. Añadir el servicio CORS
+// ======================================================
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins("http://localhost:5174", "http://localhost:5173") 
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials(); // si usas cookies o tokens Bearer
+    });
 });
 
 
@@ -50,6 +66,7 @@ builder.Services.AddScoped<ISpecialtiesServices, SpecialtiesServices>();
 builder.Services.AddScoped<ISpecialtiesRepository, SpecialtiesRepository>();
 builder.Services.AddScoped<IEmployesRepository, EmployesRepository>();
 builder.Services.AddScoped<IPositionRepository, PositionRepository>();
+builder.Services.AddScoped<IPositionServices, PositionServices>();
 
 builder.Services.AddHttpContextAccessor();
 
@@ -71,14 +88,12 @@ builder.Services.AddIdentity<User, Role>(options =>
     options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
     options.Lockout.MaxFailedAccessAttempts = 5;
     options.Lockout.AllowedForNewUsers = true;
-
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
     options.Password.RequireUppercase = true;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequiredLength = 6;
     options.User.RequireUniqueEmail = true;
-
     options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
 })
 //.AddErrorDescriber<>()
@@ -146,12 +161,18 @@ builder.Services.AddAuthorizationBuilder()
 
 builder.Services.AddOpenApi();
 
+
 var app = builder.Build();
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
-app.UseHttpsRedirection();
+
+app.UseHttpsRedirection(); // Ahora va después de UseCors
+
+app.UseCors("AllowFrontend"); // Mover aquí
+
 
 app.Use(async (context, next) =>
 {

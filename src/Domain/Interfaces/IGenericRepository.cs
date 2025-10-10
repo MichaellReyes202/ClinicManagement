@@ -16,5 +16,8 @@ namespace Domain.Interfaces
 
         Task CommitAsync();
         Task RollbackAsync();
+
+        Task<(List<T> items, int totalItems)> GetTotalAndPagination(int limit, int offset, Expression<Func<T, bool>>? filter = null);
+        Task<(IQueryable<T> query, int totalItems)> GetQueryAndTotal(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IQueryable<T>>? include = null);
     }
 }

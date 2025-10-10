@@ -23,6 +23,34 @@ namespace Infrastructure.Repositories
             dbSet = _context.Set<T>();
         }
 
+        public async Task<(IQueryable<T> query, int totalItems)> GetQueryAndTotal(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IQueryable<T>>? include = null)
+        {
+            IQueryable<T> query = dbSet;
+            if (include != null)
+            {
+                query = include(query);
+            }
+            if (filter != null)
+            {
+                query = query.Where(filter);
+            }
+            var total = await query.CountAsync();
+            return (query, total);
+        }
+
+        public async Task<(List<T> items, int totalItems)> GetTotalAndPagination(int limit, int offset, Expression<Func<T, bool>>? filter = null)
+        {
+            IQueryable<T> query = dbSet;
+            if (filter != null)
+            {
+                query = query.Where(filter);
+            }
+            var total = await query.CountAsync();
+            var items = await query.Skip(offset).Take(limit).ToListAsync();
+            return (items, total);
+
+        }
+
         public async Task AddAsync(T entity)
         {
             await dbSet.AddAsync(entity);
@@ -90,5 +118,20 @@ namespace Infrastructure.Repositories
                 await _currentTransaction.RollbackAsync();
             }
         }
+
+        // public async Task<(List<T> Datos, int TotalRegistros)> ObtenerPaginadoYTotal(PaginacionDTO paginacion, IQueryable<T> query)
+
+        public async Task<(List<T> items, int totalItems)> GetTotalAndPagination(IQueryable<T> query, int limit, int offset, Expression<Func<T, bool>>? filter = null)
+        {
+            if (filter != null)
+            {
+                query = query.Where(filter);
+            }
+            var total = await query.CountAsync();
+            var items = await query.Skip(offset).Take(limit).ToListAsync();
+            return (items, total);
+        }
+
+        
     }
 }

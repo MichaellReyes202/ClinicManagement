@@ -101,6 +101,14 @@ namespace Infrastructure.Repositories
             await _context.SaveChangesAsync();
         }
 
+        public Task<User?> GetUserWithEmployeeByEmailAsync(string email )
+        {
+            var emailNormalized = email.ToUpper();
+            return _context.Users
+                .Include(u => u.EmployeeUser)
+                .FirstOrDefaultAsync(u => u.NormalizedEmail == emailNormalized);
+        }
+
 
         //public async Task<DateTimeOffset?> GetLockoutEndDateAsync(User user)
         //{

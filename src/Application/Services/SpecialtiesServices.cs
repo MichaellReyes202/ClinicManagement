@@ -20,6 +20,16 @@ namespace Application.Services
             _mapper = mapper;
             _validator = validator;
         }
+        public async Task<List<OptionDto>> GetAllSpecialtiesOptions()
+        {
+            var positions = await _specialtiesRepository.GetAllAsync();
+            var options = positions.Select(p => new OptionDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+            }).ToList();
+            return options;
+        }
         public async Task<Result<Specialty>> AddSpecialtyAsync(SpecialtiesDto specialtiesDto)
         {
             var validationResult = await _validator.ValidateAsync(specialtiesDto);

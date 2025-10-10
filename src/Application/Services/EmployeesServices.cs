@@ -5,8 +5,8 @@ using Domain.Entities;
 using Domain.Errors;
 using Domain.Interfaces;
 using FluentValidation;
-using Microsoft.AspNetCore.Identity;
-using System.Linq.Expressions;
+using Microsoft.EntityFrameworkCore;
+
 
 namespace Application.Services
 {
@@ -22,12 +22,12 @@ namespace Application.Services
 
         public EmployesServices
         (
-            IEmployesRepository employeesRepository , 
-            IUserRepository userRepository , 
+            IEmployesRepository employeesRepository,
+            IUserRepository userRepository,
             IMapper mapper,
-            IValidator<EmployesCreationDto> validator ,
-            ISpecialtiesRepository specialtiesRepository ,
-            IPositionRepository positionRepository ,
+            IValidator<EmployesCreationDto> validator,
+            ISpecialtiesRepository specialtiesRepository,
+            IPositionRepository positionRepository,
             IUserService userService
         )
         {
@@ -40,8 +40,63 @@ namespace Application.Services
             _userService = userService;
         }
 
-        // Metodo para crear un empleado 
-        public async Task<Result<EmployesReponseDto>> AddSpecialtyAsync(EmployesCreationDto specialtiesDto)
+        // Obtener el empleado por el id  return CreatedAtRoute("ObtenerAutor",new {id = autor.Id}, autorDTO);
+        public async Task<Result<EmployeReponseDto>> GetEmployeeById(int Id)
+        {
+            try
+            {
+                if (Id <= 0) return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.BadRequest, $"The ID : {Id} sent is not valid."));
+
+                var employee = await _employeesRepository.GetByIdAsync(Id);
+                if (employee == null)
+                {
+                    return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.NotFound, $"Employee {Id} not found"));
+                }
+                var employeeDto = _mapper.Map<EmployeReponseDto>(employee);
+                return Result<EmployeReponseDto>.Success(employeeDto);
+            }
+            catch ( Exception ex )
+            {
+                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
+            }
+        }
+        
+        public async Task<Result<PaginatedResponseDto<EmployeeListDTO>>> GetAllEmployes(PaginationDto pagination)
+        {
+            try
+            {
+                var (baseQuery, total) = await _employeesRepository.GetQueryAndTotal( include : q => q.Include(e => e.Position).Include(e => e.Specialty));
+                var projectedQuery = baseQuery
+                    .Select(e => new EmployeeListDTO 
+                    {
+                        Id = e.Id,
+                        FullName = $"{e.FirstName} {e.LastName}",
+                        Dni = e.Dni,
+                        PositionName = e.Position.Name, 
+                        EspecialtyName = e.Specialty != null ? e.Specialty.Name : "N/A",
+                        ContactPhone = e.ContactPhone,
+                        Email = e.Email,
+                        IsActive = e.IsActive,
+                        PositionId = e.PositionId,
+                        SpecialtyId = e.SpecialtyId,
+                    });
+                var items = await projectedQuery
+                    .Skip(pagination.Offset)
+                    .Take(pagination.Limit)
+                    .ToListAsync();
+
+                var paginatedResponse = new PaginatedResponseDto<EmployeeListDTO>(total, items);
+                return Result<PaginatedResponseDto<EmployeeListDTO>>.Success(paginatedResponse);
+            }
+            catch (Exception ex)
+            {
+
+                return Result<PaginatedResponseDto<EmployeeListDTO>>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
+            }
+        }
+
+
+        public async Task<Result<EmployeReponseDto>> AddSpecialtyAsync(EmployesCreationDto specialtiesDto)
         {
             var valitationResult = await _validator.ValidateAsync(specialtiesDto);
             if (!valitationResult.IsValid)
@@ -49,7 +104,7 @@ namespace Application.Services
                 var errors = valitationResult.Errors
                     .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
                     .ToList();
-                return Result<EmployesReponseDto>.Failure(errors);
+                return Result<EmployeReponseDto>.Failure(errors);
             }
             try
             {
@@ -57,11 +112,11 @@ namespace Application.Services
 
                 var existingEmail = await _userRepository.ExistAsync(c => c.Email == specialtiesDto.Email);
                 if (existingEmail)
-                    return Result<EmployesReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"El correo electronico '{specialtiesDto.Email}' ya existe."));
+                    return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"El correo electronico '{specialtiesDto.Email}' ya existe."));
                 
                 var existingDni = await _employeesRepository.ExistAsync(c => c.Dni == specialtiesDto.Dni!.ToUpper());
                 if (existingDni)
-                    return Result<EmployesReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"The ID number '{specialtiesDto.Dni}' already exists."));
+                    return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"The ID number '{specialtiesDto.Dni}' already exists."));
 
                 // TODO : Falta validar que la edad concuerde con la del dni
 
@@ -72,11 +127,11 @@ namespace Application.Services
                 {
                     var specialtyExists = await _specialtiesRepository.GetByIdAsync(specialtiesDto.SpecialtyId.Value) != null;
                     if (!specialtyExists)
-                        return Result<EmployesReponseDto>.Failure(new Error(ErrorCodes.NotFound, $"The specialty with ID '{specialtiesDto.SpecialtyId.Value}' does not exist."));
+                        return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.NotFound, $"The specialty with ID '{specialtiesDto.SpecialtyId.Value}' does not exist."));
                 }
                 var positionExists = await _positionRepository.GetByIdAsync(specialtiesDto.PositionId) != null;
                 if (!positionExists)
-                    return Result<EmployesReponseDto>.Failure(new Error(ErrorCodes.NotFound, $"The position with ID '{specialtiesDto.PositionId}' does not exist."));
+                    return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.NotFound, $"The position with ID '{specialtiesDto.PositionId}' does not exist."));
 
                 
                 // creacion de un nuevo usuario 
@@ -85,14 +140,15 @@ namespace Application.Services
                 employee.UpdatedByUserId = userOnly?.Id;
                 await _employeesRepository.AddAsync(employee);
                 await _employeesRepository.SaveChangesAsync();
-                var employeeDto = _mapper.Map<EmployesReponseDto>(employee);
-                return Result<EmployesReponseDto>.Success(employeeDto);
+                var employeeDto = _mapper.Map<EmployeReponseDto>(employee);
+                return Result<EmployeReponseDto>.Success(employeeDto);
 
             }
             catch (Exception ex)
             {
-                return Result<EmployesReponseDto>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
+                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
             }
         }
+
     }
 }

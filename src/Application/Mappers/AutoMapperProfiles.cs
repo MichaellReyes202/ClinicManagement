@@ -81,26 +81,20 @@ namespace Application.Mappers
                 .ForMember(dest => dest.UpdatedByUser, opt => opt.Ignore());
 
             // Employee to EmployeeDto mapping
-            CreateMap<Employee , EmployesReponseDto>()
+            CreateMap<Employee, EmployeReponseDto>()
                 .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
-                .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.UserId ?? 0))
                 .ForMember(dest => dest.FirstName, opt => opt.MapFrom(src => src.FirstName))
                 .ForMember(dest => dest.MiddleName, opt => opt.MapFrom(src => src.MiddleName))
                 .ForMember(dest => dest.LastName, opt => opt.MapFrom(src => src.LastName))
                 .ForMember(dest => dest.SecondLastName, opt => opt.MapFrom(src => src.SecondLastName))
+                .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age))
                 .ForMember(dest => dest.PositionId, opt => opt.MapFrom(src => src.PositionId))
+                .ForMember(dest => dest.SpecialtyId, opt => opt.MapFrom(src => src.SpecialtyId))
                 .ForMember(dest => dest.ContactPhone, opt => opt.MapFrom(src => src.ContactPhone))
                 .ForMember(dest => dest.HireDate, opt => opt.MapFrom(src => DateOnly.FromDateTime(src.HireDate)))
                 .ForMember(dest => dest.Dni, opt => opt.MapFrom(src => src.Dni))
                 .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
-                .ForMember(dest => dest.SpecialtyId, opt => opt.MapFrom(src => src.SpecialtyId))
-                .ForMember(dest => dest.CreatedByUserId, opt => opt.MapFrom(src => src.CreatedByUserId))
-                .ForMember(dest => dest.UpdatedByUserId, opt => opt.MapFrom(src => src.UpdatedByUserId))
-                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => src.CreatedAt))
-                .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => src.UpdatedAt))
-                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
-                .ForMember(dest => dest.NormalizedEmail, opt => opt.MapFrom(src => src.NormalizedEmail));
-
+                .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email));
 
         }
     }
