@@ -32,7 +32,7 @@
 
         public static Result<T> Success(T value) => new(true, value, null, null);
         public new static Result<T> Failure(Error error) => new(false, default, error, null);
-        public new static Result<T> Failure(List<ValidationError> validationErrors) => 
-            new(false, default, new Error(ErrorCodes.BadRequest,"Validation Problem"), validationErrors);
+        public new static Result<T> Failure(List<ValidationError> validationErrors) =>
+            new(false, default, new Error(ErrorCodes.BadRequest, "Validation Problem"), validationErrors);
     }
 }

@@ -19,30 +19,11 @@ namespace API.Controllers
         }
 
 
-        // obtener el empleador por el id 
-        [HttpGet("{id:int}", Name = "GetEmployee")]
-        public async Task<ActionResult<EmployeReponseDto>> Get(int Id)
-        {
-            var result = await _employesServices.GetEmployeeById(Id);
-            if (result.IsSuccess)
-            {
-                return Ok(result.Value);
-            }
-            if (result.Error?.Code == ErrorCodes.NotFound)
-            {
-                return NotFound(result.Error);
-            }
-            if (result.Error?.Code == ErrorCodes.BadRequest)
-            {
-                return BadRequest(result.Error);
-            }
-            return BadRequest(result.Error);
-
-        }
-
+        // obtener todos los empleados 
         [HttpGet]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> Get([FromQuery] PaginationDto pagination)
         {
             var result = await _employesServices.GetAllEmployes(pagination);
@@ -55,7 +36,34 @@ namespace API.Controllers
                     EmployeeListDto = result.Value?.Items
                 });
             }
-            return BadRequest(result.Error);
+            return result.Error?.Code switch
+            {
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
+        }
+
+
+        // obtener el empleador por el id 
+        [HttpGet("{id:int}", Name = "GetEmployee")]
+        public async Task<ActionResult<EmployeReponseDto>> Get(int Id)
+        {
+            var result = await _employesServices.GetEmployeeById(Id);
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+            return result.Error?.Code switch
+            {
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
         }
 
 
@@ -67,25 +75,67 @@ namespace API.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CreateEmployee(EmployesCreationDto employes)
         {
-            var result = await _employesServices.AddSpecialtyAsync(employes);
+            var result = await _employesServices.AddEmployesAsync(employes);
+
             if (result.IsSuccess)
             {
                 return Ok(result.Value);
             }
-            if(result.Error?.Code == ErrorCodes.Conflict)
+            // 1. Manejar Errores de Validación (BadRequest)
+            if (result.Error?.Code == ErrorCodes.BadRequest || result.ValidationErrors.Count > 0)
+            {
+                return BadRequest(new
+                {
+                    message = result.Error?.Description ?? "One or more validation errors occurred.",
+                    errors = result.ValidationErrors
+                });
+            }
+            // 2. Manejar Conflicto (409)
+            if (result.Error?.Code == ErrorCodes.Conflict)
             {
                 return Conflict(result.Error);
             }
-            if(result.Error?.Code == ErrorCodes.BadRequest)
-            {
-                return BadRequest(new { result.Error, result.ValidationErrors });
-            }
-            if(result.Error?.Code == ErrorCodes.NotFound)
+
+            // 3. Manejar No Encontrado (404)
+            if (result.Error?.Code == ErrorCodes.NotFound)
             {
                 return NotFound(result.Error);
             }
-            return BadRequest(result.Error);
+            return StatusCode(StatusCodes.Status500InternalServerError, result.Error); // return BadRequest(result.Error); 
 
+        }
+
+        [HttpPut("{Id:int}")]
+        [Authorize]
+        [ProducesResponseType(StatusCodes.Status204NoContent)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+
+        public async Task<IActionResult> UpdateEmployee([FromBody] EmployesUpdateDto dto , int Id)
+        {
+            var result = await _employesServices.UpdateEmployesAsync(dto, Id);
+            if (result.IsSuccess)
+            {
+                return NoContent();
+            }
+            if (result.ValidationErrors.Count > 0)
+            {
+                return BadRequest(new
+                {
+                    message = "One or more validation errors have occurred in the provided fields.",
+                    errors = result.ValidationErrors
+                });
+            }
+            return result.Error?.Code switch
+            {
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
         }
 
     }

@@ -5,6 +5,7 @@ using Domain.Errors;
 using Domain.Interfaces;
 using FluentValidation;
 using Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Services
 {
@@ -19,6 +20,32 @@ namespace Application.Services
             _specialtiesRepository = specialtiesRepository;
             _mapper = mapper;
             _validator = validator;
+        }
+
+        public async Task<Result<PaginatedResponseDto<SpecialtyListDto>>> GetAllSpecialties(PaginationDto pagination)
+        {
+            try
+            {
+                var (baseQuery, total) = await _specialtiesRepository.GetQueryAndTotal();
+                var projectedQuery = baseQuery
+                        .Select(e => new SpecialtyListDto
+                        {
+                            Id = e.Id,
+                            Name = e.Name,
+                            Description = e.Description,
+                            Employees = e.Employees.Count
+                        });
+                var items = await projectedQuery
+                        .Skip(pagination.Offset)
+                        .Take(pagination.Limit)
+                        .ToListAsync();
+                var paginatedResponse = new PaginatedResponseDto<SpecialtyListDto>(total, items);
+                return Result<PaginatedResponseDto<SpecialtyListDto>>.Success(paginatedResponse);
+            }
+            catch (Exception ex)
+            {
+                return Result<PaginatedResponseDto<SpecialtyListDto>>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
+            }
         }
         public async Task<List<OptionDto>> GetAllSpecialtiesOptions()
         {
@@ -98,14 +125,11 @@ namespace Application.Services
             {
                 return Result<Specialty>.Failure(new Error(ErrorCodes.NotFound, "Specialty not found"));
             }
-            // Verificar si el nombre ya existe en otra especialidad
             var existingSpecialty = await _specialtiesRepository.GetByNameAsync(specialtiesDto.Name);
             if (existingSpecialty != null && existingSpecialty.Id != id)
             {
                 return Result<Specialty>.Failure(new Error(ErrorCodes.Conflict, $"A specialty with the name '{specialtiesDto.Name}' already exists."));
             }
-
-            // Mapear los campos actualizados
             _mapper.Map(specialtiesDto, specialty);
             specialty.UpdatedAt = DateTime.UtcNow; // Establecer UpdatedAt en UTC
             try

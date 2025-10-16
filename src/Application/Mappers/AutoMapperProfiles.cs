@@ -59,7 +59,6 @@ namespace Application.Mappers
                 .ForMember(dest => dest.LastName, opt => opt.MapFrom(src => src.LastName))
                 .ForMember(dest => dest.SecondLastName, opt => opt.MapFrom(src => src.SecondLastName))
                 .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age)) // Validar con la edad del dni
-
                 .ForMember(dest => dest.PositionId, opt => opt.MapFrom(src => src.PositionId))
                 .ForMember(dest => dest.ContactPhone, opt => opt.MapFrom(src => src.ContactPhone))
                 .ForMember(dest => dest.HireDate, opt => opt.MapFrom(src => DateTime.SpecifyKind(src.HireDate, DateTimeKind.Utc)))
@@ -70,13 +69,11 @@ namespace Application.Mappers
                 .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => true))
                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-
                 .ForMember(dest => dest.CreatedByUserId, opt => opt.Ignore()) //  será establecido en el servicio
                 .ForMember(dest => dest.UpdatedByUserId, opt => opt.Ignore()) //  será establecido en el servicio
                 .ForMember(dest => dest.User, opt => opt.Ignore())
                 .ForMember(dest => dest.Position, opt => opt.Ignore())
                 .ForMember(dest => dest.Specialty, opt => opt.Ignore())
-
                 .ForMember(dest => dest.CreatedByUser, opt => opt.Ignore())
                 .ForMember(dest => dest.UpdatedByUser, opt => opt.Ignore());
 
@@ -95,6 +92,27 @@ namespace Application.Mappers
                 .ForMember(dest => dest.Dni, opt => opt.MapFrom(src => src.Dni))
                 .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
                 .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email));
+
+            // EmployeeUpdateDto  to  Employee
+            CreateMap<EmployesUpdateDto, Employee>()
+           .ForMember(dest => dest.FirstName, opt => opt.MapFrom(src => src.FirstName))
+           .ForMember(dest => dest.MiddleName, opt => opt.MapFrom(src => src.MiddleName))
+           .ForMember(dest => dest.LastName, opt => opt.MapFrom(src => src.LastName))
+           .ForMember(dest => dest.SecondLastName, opt => opt.MapFrom(src => src.SecondLastName))
+           .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age))
+           .ForMember(dest => dest.PositionId, opt => opt.MapFrom(src => src.PositionId))
+           .ForMember(dest => dest.ContactPhone, opt => opt.MapFrom(src => src.ContactPhone))
+           .ForMember(dest => dest.HireDate, opt => opt.MapFrom(src => DateTime.SpecifyKind(src.HireDate, DateTimeKind.Utc)))
+           .ForMember(dest => dest.Dni, opt => opt.MapFrom(src => src.Dni))
+           .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
+           .ForMember(dest => dest.NormalizedEmail,opt => opt.MapFrom(src => src.Email.ToUpper()))
+           .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
+           .ForMember(dest => dest.SpecialtyId, opt => opt.MapFrom(src => src.SpecialtyId))
+           .ForMember(dest => dest.UserId, opt => opt.Ignore())
+           .ForMember(dest => dest.CreatedByUserId, opt => opt.Ignore())
+           .ForMember(dest => dest.UpdatedByUserId, opt => opt.Ignore())
+           .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+           .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow)); // Se establece manualmente en el servicio
 
         }
     }

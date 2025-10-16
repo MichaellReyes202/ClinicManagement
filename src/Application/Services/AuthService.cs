@@ -25,7 +25,6 @@ namespace Application.Services
     {
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
-        private readonly IHttpContextAccessor _contextAccessor;
         private readonly IConfiguration _configuration;
         private readonly IValidator<LoginDto> _validatorLogin;
         private readonly IValidator<RegisterDto> validatorRegister;
@@ -33,6 +32,7 @@ namespace Application.Services
         private readonly IEmployesRepository _employesRepository;
         private readonly IRoleRepository _roleRepository;
         private readonly IUserRepository _userRepository;
+        private readonly IUserService _userService;
 
         public AuthService
         (
@@ -45,14 +45,14 @@ namespace Application.Services
             IMapper mapper , 
             IEmployesRepository employesRepository ,
             IRoleRepository roleRepository ,
-            IUserRepository userRepository
+            IUserRepository userRepository ,
+            IUserService userService
 
 
         )
         {
             this._userManager = userManager;
             this._signInManager = signInManager;
-            this._contextAccessor = contextAccessor;
             this._configuration = configuration;
             this._validatorLogin = validator_login;
             this.validatorRegister = validatorRegister;
@@ -60,6 +60,7 @@ namespace Application.Services
             _employesRepository = employesRepository;
             _roleRepository = roleRepository;
             _userRepository = userRepository;
+            _userService = userService;
         }
 
         public async Task<Result<AuthResponse>> LoginAsync(LoginDto loginDto)
@@ -76,7 +77,7 @@ namespace Application.Services
 
             var user = await _userRepository.GetUserWithEmployeeByEmailAsync(loginDto.Email);
             if (user is null)
-                return Result<AuthResponse>.Failure(new Error(ErrorCodes.BadRequest , "Invalid Credentials"));
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized , "Invalid Credentials"));
 
             if (await _userManager.IsLockedOutAsync(user))
             {
@@ -108,15 +109,15 @@ namespace Application.Services
             }
             if (!result.Succeeded)
             {
-                return Result<AuthResponse>.Failure(new Error(ErrorCodes.BadRequest, "Invalid Credentials"));
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "Invalid Credentials"));
             }
             else
             {
+                user.LastLogin = DateTime.UtcNow;
+                await _userRepository.UpdateAsync(user);
+                await _userRepository.SaveChangesAsync();
                 return Result<AuthResponse>.Success(await GenerateJwtTokenAsync(user));
             }
-                
-
-
         }
 
 
@@ -181,6 +182,25 @@ namespace Application.Services
             }
         }
 
+        public async Task<Result<AuthResponse>> GetUserOnly()
+        {
+            try
+            {
+                var email = await _userService.GetEmailUserOnlyAsync();
+                if (email == null)
+                    return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "User not found (request)"));
+
+                var userOnly = await _userRepository.GetUserWithEmployeeByEmailAsync(email);
+                if (userOnly is null)
+                    return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "User not Authorize"));
+                return Result<AuthResponse>.Success(await GenerateJwtTokenAsync(userOnly));
+            }
+            catch (Exception)
+            {
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unexpected, "Internal server Error"));
+            }
+        }
+
         public async Task<AuthResponse> GenerateJwtTokenAsync(User user)
         {
             var claims = new List<Claim>
@@ -215,7 +235,7 @@ namespace Application.Services
                     Id = user.Id,
                     Email = user.Email,
                     FullName = $"{user.EmployeeUser?.FirstName} {user.EmployeeUser?.LastName}",
-                    IsActive = user.IsActive ?? false,
+                    IsActive = user.IsActive ,
                     Roles = [.. roles]
                 }
             };

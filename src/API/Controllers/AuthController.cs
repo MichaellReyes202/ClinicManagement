@@ -29,26 +29,27 @@ namespace API.Controllers
         public async Task<ActionResult<AuthResponse>> Register(RegisterDto register)
         {
             var result = await _authService.RegisterAsync(register);
-            if (result.IsFailure)
+            if (result.IsSuccess)
             {
-                if (result.ValidationErrors.Count != 0)
-                {
-                    return BadRequest(result.ValidationErrors);
-                }
-                if (result.Error?.Code == ErrorCodes.BadRequest)
-                {
-                    return NotFound(new { result.Error, result.Error.Description });
-                }
-                if (result.Error?.Code == ErrorCodes.TooManyRequests)
-                {
-                    return StatusCode(429,new { result.Error, result.Error.Description });
-                }
-                if (result.Error?.Code == ErrorCodes.Conflict)
-                {
-                    return Conflict(new { result.Error, result.Error.Description });
-                }
+                return Ok(result.Value);
             }
-            return Ok(result.Value);
+            if (result.Error?.Code == ErrorCodes.BadRequest || result.ValidationErrors.Count > 0)
+            {
+                return BadRequest(new
+                {
+                    message = result.Error?.Description ?? "One or more validation errors occurred.",
+                    errors = result.ValidationErrors
+                });
+            }
+            if (result.Error?.Code == ErrorCodes.TooManyRequests)
+            {
+                return StatusCode(429,result.Error);
+            }
+            if (result.Error?.Code == ErrorCodes.Conflict)
+            {
+                return Conflict(result.Error);
+            }
+            return StatusCode(StatusCodes.Status500InternalServerError, result.Error);
         }
 
         [HttpPost("login")]
@@ -64,19 +65,46 @@ namespace API.Controllers
             {
                 return Ok(result.Value);
             }
-            if(result.ValidationErrors.Count != 0)
+            if (result.Error?.Code == ErrorCodes.BadRequest || result.ValidationErrors.Count > 0)
             {
-                return BadRequest(result.ValidationErrors);
+                return BadRequest(new
+                {
+                    message = result.Error?.Description ?? "One or more validation errors occurred.",
+                    errors = result.ValidationErrors
+                });
             }
-            if(result.Error?.Code == ErrorCodes.BadRequest)
+            if(result.Error?.Code == ErrorCodes.Unauthorized)
             {
-                return BadRequest(new { result.Error, result.Error.Description });
+                return Unauthorized(result.Error);
             }
             if(result.Error?.Code == ErrorCodes.TooManyRequests)
             {
-                return StatusCode(429, new { result.Error, result.Error.Description });
+                return StatusCode(429, result.Error);
             }
-            return StatusCode(500, new { result.Error, result.Error.Description });
+
+            return StatusCode(StatusCodes.Status500InternalServerError, result.Error);
         }
+
+        [Authorize]
+        [HttpGet("check-status")]
+        public async Task<ActionResult<AuthResponse>> CheckAuthStatus()
+        {
+            var result = await _authService.GetUserOnly();
+
+            if (result.IsSuccess)
+                return Ok(result.Value);
+
+            if(result.Error?.Code == ErrorCodes.BadRequest)
+            {
+                return BadRequest(result.Error);
+            }
+            if (result.Error?.Code == ErrorCodes.Unauthorized)
+            {
+                return BadRequest(result.Error);
+            }
+            return StatusCode(500 , result.Error);
+
+        }
+
     }
 }

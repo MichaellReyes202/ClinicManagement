@@ -1,5 +1,7 @@
 ﻿// Define la interfaz para operaciones sobre usuarios
+using Application.DTOs;
 using Domain.Entities;
+using Domain.Errors;
 
 namespace Application.Interfaces
 {
@@ -9,6 +11,7 @@ namespace Application.Interfaces
         Task<User?> GetCurrentUserAsync();
 
         // obtener todos los usuarios
-        Task<IEnumerable<User>> GetAllUsersAsync();
+        Task<Result<PaginatedResponseDto<UserListDto>>> GetAllUsersAsync(PaginationDto pagination);
+        Task<string?> GetEmailUserOnlyAsync();
     }
 }

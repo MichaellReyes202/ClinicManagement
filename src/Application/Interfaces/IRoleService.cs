@@ -23,7 +23,6 @@ namespace Application.Interfaces
         Task<bool> IsUserInRoleAsync(string email, string roleName);
         Task<Result<Role>> CreateRoleAsync(RoleDto roleCreaction);
         Task DeleteRoleAsync(string roleName);
-
-
+        Task<List<OptionDto>> GetAllRolesOptions();
     }
 }

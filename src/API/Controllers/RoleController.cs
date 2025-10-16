@@ -1,5 +1,6 @@
 ﻿using Application.DTOs;
 using Application.Interfaces;
+using Application.Services;
 using Domain.Errors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -16,7 +17,14 @@ namespace API.Controllers
         {
             _roleService = roleService;
         }
-        // obtener el role por el id 
+
+        [HttpGet("listOption")]
+        public async Task<ActionResult<List<OptionDto>>> GetListOption()
+        {
+            return await _roleService.GetAllRolesOptions();
+        }
+
+
         [HttpPut("{id:int}")]
         [ProducesResponseType(typeof(RoleDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -45,11 +53,19 @@ namespace API.Controllers
             {
                 return CreatedAtAction(nameof(GetRoleById), new { id = result.Value!.Id }, result.Value);
             }
+            if (result.Error?.Code == ErrorCodes.BadRequest || result.ValidationErrors.Count > 0)
+            {
+                return BadRequest(new
+                {
+                    message = result.Error?.Description ?? "One or more validation errors occurred.",
+                    errors = result.ValidationErrors
+                });
+            }
             if (result.Error!.Code == ErrorCodes.Conflict)
             {
                 return Conflict(result.Error); // Retorna 409 Conflict
             }
-            return BadRequest(result.Error);
+            return StatusCode(StatusCodes.Status500InternalServerError, result.Error);
         }
 
         // asignar un role a un usuario
@@ -67,19 +83,27 @@ namespace API.Controllers
             {
                 return Ok();
             }
-            if(result.Error!.Code == ErrorCodes.Unauthorized)
+            if (result.Error?.Code == ErrorCodes.BadRequest || result.ValidationErrors.Count > 0)
             {
-                return Unauthorized(result.Error); // Retorna 401 Unauthorized
+                return BadRequest(new
+                {
+                    message = result.Error?.Description ?? "One or more validation errors occurred.",
+                    errors = result.ValidationErrors
+                });
+            }
+            if (result.Error!.Code == ErrorCodes.Unauthorized)
+            {
+                return Unauthorized(result.Error);
             }
             if (result.Error!.Code == ErrorCodes.NotFound)
             {
-                return NotFound(result.Error); // Retorna 404 Not Found
+                return NotFound(result.Error);
             }
             if (result.Error!.Code == ErrorCodes.Conflict)
             {
-                return Conflict(result.Error); // Retorna 409 Conflict
+                return Conflict(result.Error);
             }
-            return BadRequest(result.Error); // Retorna 400 Bad Request para otros errores
+            return StatusCode(StatusCodes.Status500InternalServerError, result.Error);
         }
     }
 }

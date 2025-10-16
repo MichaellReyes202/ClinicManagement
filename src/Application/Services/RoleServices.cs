@@ -41,9 +41,19 @@ namespace Application.Services
             _roleRepository = roleRepository;
             _mapper = mapper;
         }
+
+        public async Task<List<OptionDto>> GetAllRolesOptions()
+        {
+            var roles = await _roleRepository.GetAllAsync();
+            var options = roles.Select(p => new OptionDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+            }).ToList();
+            return options;
+        }
         public async Task<Result<Role>> GetRoleByIdAsync(int id)
         {
-            // buscar el rol por el id
             var role = await _roleManager.Roles.FirstOrDefaultAsync(r => r.Id == id);
             if (role is null)
             {
@@ -58,17 +68,17 @@ namespace Application.Services
                 var user = await _userManager.FindByEmailAsync(assignRoleDto.Email);
                 if (user is null)
                 {
-                    return Result.Failure(new Error(ErrorCodes.Unauthorized, $"user with email {assignRoleDto.Email} was not found"));
+                    return Result.Failure(new Error(ErrorCodes.Unauthorized, $"user with email {assignRoleDto.Email} was not found","Email"));
                 }
                 var roleExists = await _roleManager.RoleExistsAsync(assignRoleDto.RoleName);
                 if (!roleExists)
                 {
-                    return Result.Failure(new Error(ErrorCodes.NotFound, $"Role {assignRoleDto.RoleName} does not exist"));
+                    return Result.Failure(new Error(ErrorCodes.NotFound, $"Role {assignRoleDto.RoleName} does not exist", "RoleName"));
                 }
                 var isInRole = await _userManager.IsInRoleAsync(user, assignRoleDto.RoleName);
                 if (isInRole)
                 {
-                    return Result.Failure(new Error(ErrorCodes.Conflict, $"User {assignRoleDto.Email} already has the role {assignRoleDto.RoleName}"));
+                    return Result.Failure(new Error(ErrorCodes.Conflict, $"User {assignRoleDto.Email} already has the role {assignRoleDto.RoleName}", "RoleName"));
                 }
                 try
                 {
@@ -115,7 +125,7 @@ namespace Application.Services
                     var existingRole = await _roleRepository.FindByNameAsync(roleCreaction.Name);
                     if (existingRole != null)
                     {
-                        return Result<Role>.Failure(new Error(ErrorCodes.Conflict, $"Role with name {roleCreaction.Name} already exists"));
+                        return Result<Role>.Failure(new Error(ErrorCodes.Conflict, $"Role with name {roleCreaction.Name} already exists", "Name"));
                     }
                     var role = _mapper.Map<Role>(roleCreaction);
 

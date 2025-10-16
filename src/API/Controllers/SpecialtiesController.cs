@@ -17,6 +17,25 @@ namespace API.Controllers
             _specialtiesServices = specialtiesServices;
         }
 
+        /// retonar todas las especialides medicas 
+        [HttpGet]
+        public async Task<ActionResult<Result<PaginatedResponseDto<SpecialtyListDto>>>> Get([FromQuery] PaginationDto pagination)
+        {
+            var result = await _specialtiesServices.GetAllSpecialties(pagination);
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+            return result.Error?.Code switch
+            {
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
+        }
+
 
         [HttpGet("listOption")]
         public async Task<ActionResult<List<OptionDto>>> GetListOption()
@@ -34,20 +53,16 @@ namespace API.Controllers
         public async Task<ActionResult<Specialty>> CreateSpecialty(SpecialtiesDto specialtiesDto)
         {
             var result =  await _specialtiesServices.AddSpecialtyAsync(specialtiesDto);
-            if (result.IsFailure)
+            if(result.IsSuccess) 
+                return CreatedAtAction(nameof(GetSpecialty), new { id = result.Value!.Id }, result.Value);
+            return result.Error?.Code switch
             {
-                // La operación falló, maneja los errores.
-                if (result.ValidationErrors.Count != 0)
-                {
-                    return BadRequest(result.ValidationErrors);
-                }
-                if (result.Error?.Code == ErrorCodes.Conflict)
-                {
-                    return Conflict(new { error = result.Error.Description });
-                }
-                return StatusCode(result.Error!.Code.StatusCode, new { error = result.Error.Description });
-            }
-            return CreatedAtAction(nameof(GetSpecialty), new { id = result.Value!.Id }, result.Value);
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
         }
 
         [HttpGet("{id}")]
@@ -57,19 +72,16 @@ namespace API.Controllers
         public async Task<ActionResult<Specialty>> GetSpecialty(int id)
         {
             var result = await _specialtiesServices.GetByIdAsync(id);
-            if (result.IsFailure)
+            if (result.IsSuccess)
+                return Ok(result.Value);
+            return result.Error?.Code switch
             {
-                if (result.Error?.Code == ErrorCodes.NotFound)
-                {
-                    return NotFound(new { result.Error, result.Error.Description });
-                }
-                if (result.Error?.Code == ErrorCodes.BadRequest)
-                {
-                    return BadRequest(result.ValidationErrors);
-                }
-                return StatusCode(500, new { result.Error });
-            }
-            return Ok(result.Value);
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
         }
         [HttpPut("{id}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
