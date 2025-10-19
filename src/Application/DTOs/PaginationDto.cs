@@ -11,5 +11,6 @@ namespace Application.DTOs
         private const int CantidadMaximaLimit = 20;
         public int Limit { get; init; } = Math.Clamp(Limit, 1, CantidadMaximaLimit);
         public int Offset { get; init; } = Math.Max(0, Offset);
+        public string? Query {  get; init; }
     }
 }

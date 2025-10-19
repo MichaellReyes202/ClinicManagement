@@ -1,4 +1,5 @@
-﻿using Domain.Interfaces;
+﻿using Application.DTOs;
+using Domain.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -23,21 +24,44 @@ namespace Infrastructure.Repositories
             dbSet = _context.Set<T>();
         }
 
-        public async Task<(IQueryable<T> query, int totalItems)> GetQueryAndTotal(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IQueryable<T>>? include = null)
+        public async Task<(IQueryable<T> query, int totalItems)> GetQueryAndTotal( Expression<Func<T, bool>>? filter = null,Func<IQueryable<T>, IQueryable<T>>? include = null)
         {
             IQueryable<T> query = dbSet;
+
             if (include != null)
             {
                 query = include(query);
             }
+
             if (filter != null)
             {
                 query = query.Where(filter);
             }
-            var total = await query.CountAsync();
+
+            var total = await query.CountAsync(); // total filtrado
+
             return (query, total);
         }
 
+        //private static IQueryable<EmployeeSearchDto> ApplyOrdering(IQueryable<EmployeeSearchDto> query, string? sortBy,string? sortDirection)
+        //{
+        //    // Lista blanca de columnas ordenables
+        //    var validColumns = new Dictionary<string, Expression<Func<EmployeeSearchDto, object>>>
+        //    {
+        //        { "FullName", e => e.FullName },
+        //        { "Dni", e => e.Dni },
+        //        { "Id", e => e.Id }
+        //    };
+
+        //    if (string.IsNullOrEmpty(sortBy) || !validColumns.ContainsKey(sortBy))
+        //        return query.OrderBy(e => e.FullName); // orden por defecto
+
+        //    var keySelector = validColumns[sortBy];
+        //    bool descending = sortDirection?.ToLower() == "desc";
+
+        //    return descending ? query.OrderByDescending(keySelector) : query.OrderBy(keySelector);
+        //}
+     
         public async Task<(List<T> items, int totalItems)> GetTotalAndPagination(int limit, int offset, Expression<Func<T, bool>>? filter = null)
         {
             IQueryable<T> query = dbSet;
@@ -132,6 +156,18 @@ namespace Infrastructure.Repositories
             return (items, total);
         }
 
-        
+        public Expression<Func<E, bool>> CombineFilters<E>(Expression<Func<E, bool>> f1, Expression<Func<E, bool>> f2)
+        {
+            var parameter = Expression.Parameter(typeof(T));
+
+            var combined = Expression.Lambda<Func<E, bool>>(
+                Expression.AndAlso(
+                    Expression.Invoke(f1, parameter),
+                    Expression.Invoke(f2, parameter)
+                ),
+                parameter
+            );
+            return combined;
+        }
     }
 }

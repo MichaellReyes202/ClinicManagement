@@ -18,8 +18,29 @@ namespace API.Controllers
             _employesServices = employesServices;
         }
 
-
-        // obtener todos los empleados 
+        [HttpGet("search")]
+        [Authorize]
+        public async Task<IActionResult> SearchEmployees([FromQuery] PaginationDto pagination)
+        {
+            var result = await _employesServices.EmployeesWithoutUsers(pagination);
+            if(result.IsSuccess)
+            {
+                return Ok(new
+                {
+                    count = result.Value?.Count,
+                    pages = result.Value?.Pages,
+                    EmployeeListSearchDto = result.Value?.Items
+                });
+            }
+            return result.Error?.Code switch
+            {
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
+        }
         [HttpGet]
         [Authorize]
         [ProducesResponseType(StatusCodes.Status200OK)]

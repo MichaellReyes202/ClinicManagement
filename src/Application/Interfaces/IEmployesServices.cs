@@ -12,6 +12,7 @@ namespace Application.Interfaces
     public interface IEmployesServices
     {
         Task<Result<EmployeReponseDto>> AddEmployesAsync(EmployesCreationDto specialtiesDto);
+        Task<Result<PaginatedResponseDto<EmployeeSearchDto>>> EmployeesWithoutUsers(PaginationDto pagination);
         Task<Result<PaginatedResponseDto<EmployeeListDTO>>> GetAllEmployes(PaginationDto pagination);
         Task<Result<EmployeReponseDto>> GetEmployeeById(int Id);
         Task<Result> UpdateEmployesAsync(EmployesUpdateDto dto, int employeeId);

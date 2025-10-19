@@ -33,7 +33,7 @@ namespace API.Controllers
             {
                 return Ok(result.Value);
             }
-            if (result.Error?.Code == ErrorCodes.BadRequest || result.ValidationErrors.Count > 0)
+            if ( result.ValidationErrors.Count > 0)
             {
                 return BadRequest(new
                 {
@@ -41,15 +41,14 @@ namespace API.Controllers
                     errors = result.ValidationErrors
                 });
             }
-            if (result.Error?.Code == ErrorCodes.TooManyRequests)
+            return result.Error?.Code switch
             {
-                return StatusCode(429,result.Error);
-            }
-            if (result.Error?.Code == ErrorCodes.Conflict)
-            {
-                return Conflict(result.Error);
-            }
-            return StatusCode(StatusCodes.Status500InternalServerError, result.Error);
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
         }
 
         [HttpPost("login")]

@@ -42,10 +42,10 @@ namespace Application.Services
             IConfiguration configuration,
             IValidator<LoginDto> validator_login,
             IValidator<RegisterDto> validatorRegister,
-            IMapper mapper , 
-            IEmployesRepository employesRepository ,
-            IRoleRepository roleRepository ,
-            IUserRepository userRepository ,
+            IMapper mapper,
+            IEmployesRepository employesRepository,
+            IRoleRepository roleRepository,
+            IUserRepository userRepository,
             IUserService userService
 
 
@@ -77,7 +77,7 @@ namespace Application.Services
 
             var user = await _userRepository.GetUserWithEmployeeByEmailAsync(loginDto.Email);
             if (user is null)
-                return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized , "Invalid Credentials"));
+                return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "Invalid Credentials"));
 
             if (await _userManager.IsLockedOutAsync(user))
             {
@@ -98,12 +98,12 @@ namespace Application.Services
 
             var result = await _signInManager
                 .CheckPasswordSignInAsync(user, loginDto.Password, lockoutOnFailure: true);
-            
-            if(result.IsLockedOut)
+
+            if (result.IsLockedOut)
             {
                 return Result<AuthResponse>.Failure(new Error(ErrorCodes.TooManyRequests, "User account is locked due to multiple failed login attempts. Please try again later."));
-            }   
-            if( result.IsNotAllowed)
+            }
+            if (result.IsNotAllowed)
             {
                 return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "User is not allowed to sign in. Please contact support."));
             }
@@ -137,14 +137,17 @@ namespace Application.Services
                 var employe = await _employesRepository.GetByIdAsync(registerDto.EmployeeId);
                 if (employe is null)
                     return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The employee with ID '{registerDto.EmployeeId}' does not exist."));
+
                 if (employe.UserId.HasValue && employe.UserId.Value > 0)
                     return Result<UserDto>.Failure(new Error(ErrorCodes.Conflict, "The employee already has an associated user account."));
+
                 var role = await _roleRepository.GetByIdAsync(registerDto.RoleId);
                 if (role is null)
                 {
                     return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The role with ID '{registerDto.RoleId}' does not exist."));
                 }
-                var emailGenerator = RemoveDiacritics.Remove( $"{employe.FirstName.ToLower()}.{employe.LastName.ToLower()}{employe.Id}@oficentro.com");
+
+                var emailGenerator = RemoveDiacritics.Remove($"{employe.FirstName.ToLower()}.{employe.LastName.ToLower()}{employe.Id}@oficentro.com");
                 var initialPassword = PasswordGenerator.GenerateTemporaryPassword();
 
                 var userDto = new UserDto
@@ -208,7 +211,7 @@ namespace Application.Services
                 new(ClaimTypes.Email, user.Email),
                 new(JwtRegisteredClaimNames.Sub , user.Email),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            }; 
+            };
             var roles = await _userManager.GetRolesAsync(user);
 
             claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
@@ -218,7 +221,7 @@ namespace Application.Services
             var expiration = DateTime.UtcNow.AddDays(1);
 
             var tokenDeSeguridad = new JwtSecurityToken(
-                 issuer: null ,// jwtSettings["Issuer"],
+                 issuer: null,// jwtSettings["Issuer"],
                  audience: null, // jwtSettings["Audience"],
                  claims: claims,
                  expires: expiration,
@@ -235,7 +238,7 @@ namespace Application.Services
                     Id = user.Id,
                     Email = user.Email,
                     FullName = $"{user.EmployeeUser?.FirstName} {user.EmployeeUser?.LastName}",
-                    IsActive = user.IsActive ,
+                    IsActive = user.IsActive,
                     Roles = [.. roles]
                 }
             };

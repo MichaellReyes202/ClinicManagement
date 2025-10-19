@@ -70,7 +70,10 @@ public class EmployesUpdateDtoValidator : AbstractValidator<EmployesUpdateDto>
         RuleFor(x => x.SpecialtyId)
             .GreaterThan(0).WithMessage("Specialty ID must be greater than zero.")
             .When(x => x.SpecialtyId.HasValue);
-
+        // IsActive
+        RuleFor(x => x.IsActive)
+            .NotNull()
+            .WithMessage("The IsActive field is required.");
 
     }
 }

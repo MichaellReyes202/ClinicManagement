@@ -19,5 +19,6 @@ namespace Domain.Interfaces
 
         Task<(List<T> items, int totalItems)> GetTotalAndPagination(int limit, int offset, Expression<Func<T, bool>>? filter = null);
         Task<(IQueryable<T> query, int totalItems)> GetQueryAndTotal(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IQueryable<T>>? include = null);
+        Expression<Func<E, bool>> CombineFilters<E>(Expression<Func<E, bool>> f1, Expression<Func<E, bool>> f2);
     }
 }
