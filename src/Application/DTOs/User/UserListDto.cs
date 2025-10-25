@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Application.DTOs;
+namespace Application.DTOs.User;
 public class UserListDto
 {
     public int Id { get; set; } // id del usuario

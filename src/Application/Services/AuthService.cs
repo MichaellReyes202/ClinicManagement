@@ -1,4 +1,5 @@
-﻿using Application.DTOs;
+﻿using Application.DTOs.Auth;
+using Application.DTOs.User;
 using Application.Interfaces;
 using Application.Util;
 using AutoMapper;

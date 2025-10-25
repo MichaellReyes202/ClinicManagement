@@ -1,4 +1,5 @@
 ﻿using Application.DTOs;
+using Application.DTOs.User;
 using Application.Interfaces;
 using Domain.Entities;
 using Domain.Errors;

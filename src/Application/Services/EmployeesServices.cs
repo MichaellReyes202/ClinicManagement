@@ -1,4 +1,5 @@
 ﻿using Application.DTOs;
+using Application.DTOs.Employee;
 using Application.Interfaces;
 using AutoMapper;
 using Domain.Entities;
@@ -46,7 +47,7 @@ public class EmployesServices : IEmployesServices
     public async Task<Result<PaginatedResponseDto<EmployeeSearchDto>>> EmployeesWithoutUsers(PaginationDto pagination)
     {
         var searchTerm = pagination.Query?.Trim().ToLower() ?? string.Empty;
-        Expression<Func<Employee, bool>> filter = e => (e.UserId == null && e.IsActive == false);
+        Expression<Func<Employee, bool>> filter = e => (e.UserId == null && e.IsActive == true);
         if (!string.IsNullOrEmpty(searchTerm))
         {
             Expression<Func<Employee, bool>> searchFilter = e =>

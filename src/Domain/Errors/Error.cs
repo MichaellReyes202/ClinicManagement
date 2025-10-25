@@ -4,7 +4,6 @@ using System.Text.Json.Serialization;
 
 namespace Domain.Errors;
 
-
 public class Error
 {
     // 1. Cambiar el tipo de dato de Code a string
@@ -34,31 +33,3 @@ public class Error
     }
 }
 
-
-//public class Error
-//{
-//    [JsonIgnore]
-//    public ErrorCodes Code { get; }
-
-//    [JsonPropertyName("code")] // Este se serializa en su lugar
-//    public string CodeValue => Code.Code;
-
-//    public string Description { get; }
-//    public string Field { get; }
-
-//    //Constructor para errores generales(sin campo específico)
-//    public Error(ErrorCodes code, string description)
-//    {
-//        Code = code;
-//        Description = description;
-//        Field = null; // Se deja vacío/nulo
-//    }
-
-//    // Nuevo Constructor para errores de campo específico (e.g., 409 Conflict)
-//    public Error(ErrorCodes code, string description, string field)
-//    {
-//        Code = code;
-//        Description = description;
-//        Field = field;
-//    }
-//}

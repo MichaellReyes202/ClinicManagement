@@ -1,8 +1,7 @@
-﻿
-using Application.DTOs;
+﻿using Application.DTOs.Employee;
 using FluentValidation;
 
-namespace Application.Validators;
+namespace Application.Validators.Employee;
 public class EmployesUpdateDtoValidator : AbstractValidator<EmployesUpdateDto>
 {
     public EmployesUpdateDtoValidator()

@@ -15,5 +15,7 @@ public partial class Specialty
 
     public DateTime UpdatedAt { get; set; }
 
+    public bool IsActive { get; set; }
+
     public virtual ICollection<Employee> Employees { get; set; } = new List<Employee>();
 }

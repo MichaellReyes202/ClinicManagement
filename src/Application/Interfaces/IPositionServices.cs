@@ -1,14 +1,17 @@
 ﻿using Application.DTOs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Application.DTOs.Position;
+using Domain.Entities;
+using Domain.Errors;
+
 
 namespace Application.Interfaces
 {
     public interface IPositionServices
     {
+        Task<Result<Position>> AddPositionAsync(PositionCreationDto positionDto);
+        Task<Result<PaginatedResponseDto<PositionListDto>>> GetAllPosition(PaginationDto pagination);
         Task<List<OptionDto>> GetAllPositionOptions();
+        Task<Result<Position>> GetByIdAsync(int id);
+        Task<Result> UpdatePositionAsync(int id, PositionUpdateDto positionUpdate);
     }
 }

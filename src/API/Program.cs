@@ -2,8 +2,9 @@
 using Application.Interfaces;
 using Application.Mappers;
 using Application.Services;
-using Application.Validators;
+using Application.Validators.Auth;
 using Domain.Entities;
+using Domain.Errors;
 using Domain.Interfaces;
 using FluentValidation;
 using FluentValidation.AspNetCore;
@@ -12,6 +13,7 @@ using Infrastructure.Repositories;
 using Infrastructure.Store;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -36,6 +38,29 @@ builder.Services.AddDbContext<ClinicDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var validationErrors = context.ModelState
+           .Where(ms => ms.Value?.Errors.Count > 0)
+           .SelectMany(kvp => kvp.Value!.Errors.Select(e =>
+               new ValidationError(kvp.Key, e.ErrorMessage)))
+           .ToList();
+        // Devolvemos el mismo formato que usas en tus servicios
+        var result = Result.Failure(validationErrors);
+
+        return new BadRequestObjectResult(new
+        {
+            message = "Validation failed - check required fields",
+            errors = result.ValidationErrors.Select(v => new
+            {
+                propertyName = v.PropertyName,
+                errorMessage = v.ErrorMessage
+            })
+        });
+    };
+});
 
 // ======================================================
 // 1. Añadir el servicio CORS

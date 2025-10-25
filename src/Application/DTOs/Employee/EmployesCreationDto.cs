@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Application.DTOs;
+namespace Application.DTOs.Employee;
 public class EmployesCreationDto
 {
     public required string FirstName { get; set; } = null!;
@@ -15,8 +15,8 @@ public class EmployesCreationDto
 
     public required int PositionId { get; set; } // Cargo que ocupa el empleado
     public string? ContactPhone { get; set; }
-    public DateTime HireDate { get; set; } // Fecha de contratación
-    public required string Dni { get; set; } // numero de cedula de identidad de nicaragua
-    public int? SpecialtyId { get; set; } // Especialidad a la que pertenece el empleado
-    public string Email { get; set; } = null!; // Correo personal del emplado 
+    public DateTime HireDate { get; set; } 
+    public required string Dni { get; set; } 
+    public int? SpecialtyId { get; set; } 
+    public string Email { get; set; } = null!; 
 }

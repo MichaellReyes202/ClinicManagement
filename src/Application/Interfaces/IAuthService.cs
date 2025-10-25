@@ -1,6 +1,7 @@
-﻿using Application.DTOs;
-using Domain.Errors;
+﻿using Domain.Errors;
 using Domain.Entities;
+using Application.DTOs.User;
+using Application.DTOs.Auth;
 
 
 // Define la interfaz para los métodos de autenticación

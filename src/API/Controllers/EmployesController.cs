@@ -4,6 +4,7 @@ using Application.Interfaces;
 using Domain.Errors;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
+using Application.DTOs.Employee;
 
 namespace API.Controllers
 {
@@ -88,8 +89,8 @@ namespace API.Controllers
         }
 
 
-        [HttpPost("createEmployes")]
         [Authorize]
+        [HttpPost("createEmployes")]
         [ProducesResponseType( StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -102,27 +103,22 @@ namespace API.Controllers
             {
                 return Ok(result.Value);
             }
-            // 1. Manejar Errores de Validación (BadRequest)
-            if (result.Error?.Code == ErrorCodes.BadRequest || result.ValidationErrors.Count > 0)
+            if (result.ValidationErrors.Count > 0)
             {
                 return BadRequest(new
                 {
-                    message = result.Error?.Description ?? "One or more validation errors occurred.",
+                    message = "One or more validation errors have occurred in the provided fields.",
                     errors = result.ValidationErrors
                 });
             }
-            // 2. Manejar Conflicto (409)
-            if (result.Error?.Code == ErrorCodes.Conflict)
+            return result.Error?.Code switch
             {
-                return Conflict(result.Error);
-            }
-
-            // 3. Manejar No Encontrado (404)
-            if (result.Error?.Code == ErrorCodes.NotFound)
-            {
-                return NotFound(result.Error);
-            }
-            return StatusCode(StatusCodes.Status500InternalServerError, result.Error); // return BadRequest(result.Error); 
+                ErrorCodes.BadRequest => BadRequest(result.Error),
+                ErrorCodes.Conflict => Conflict(result.Error),
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
 
         }
 

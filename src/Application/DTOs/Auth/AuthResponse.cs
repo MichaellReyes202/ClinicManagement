@@ -1,5 +1,5 @@
 ﻿// Devuelve el resultado de una autenticación exitosa
-namespace Application.DTOs
+namespace Application.DTOs.Auth
 {
     public class AuthResponse
     {

@@ -1,9 +1,8 @@
-﻿
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 
 // Contiene los datos que un usuario envía para iniciar sesión 
-namespace Application.DTOs
+namespace Application.DTOs.Auth
 {
     public class LoginDto
     {

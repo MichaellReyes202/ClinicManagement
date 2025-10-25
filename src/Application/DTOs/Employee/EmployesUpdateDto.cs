@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Application.DTOs;
+namespace Application.DTOs.Employee;
 public class EmployesUpdateDto
 {
     public int Id { get; set; }

@@ -1,6 +1,8 @@
-﻿
-
-using Application.DTOs;
+﻿using Application.DTOs.Employee;
+using Application.DTOs.Position;
+using Application.DTOs.Role;
+using Application.DTOs.specialty;
+using Application.DTOs.User;
 using AutoMapper;
 using Domain.Entities;
 
@@ -26,12 +28,38 @@ namespace Application.Mappers
                 .ForMember(dest => dest.AccessFailedCount, opt => opt.MapFrom(src => 0));
 
 
-            CreateMap<SpecialtiesDto, Specialty>()
+            // Mapeo para la creacion de las especialidad 
+            CreateMap<SpecialtiesCreateDto, Specialty>()
                 .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name))
                 .ForMember(dest => dest.Description, opt => opt.MapFrom(src => src.Description))
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => true))
                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForMember(dest => dest.Employees, opt => opt.Ignore());
+
+            // Mapeo para la actualizacion de la especialidad 
+            CreateMap<SpecialtiesUpdateDto, Specialty>()
+                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name))
+                .ForMember(dest => dest.Description, opt => opt.MapFrom(src => src.Description))
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive));
+
+
+            // Mapeo para la creacion del cargo 
+            CreateMap<PositionCreationDto , Position>()
+                .ForMember(dest => dest.Name , opt => opt.MapFrom(src => src.Name))
+                .ForMember(dest => dest.Description , opt => opt.MapFrom(src => src.Description))
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => true))
+                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+                .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+                .ForMember(dest => dest.Employees, opt => opt.Ignore());
+
+            // Mapeo para la actualizacion del cargo 
+            CreateMap<PositionUpdateDto , Position>()
+                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name))
+                .ForMember(dest => dest.Description, opt => opt.MapFrom(src => src.Description))
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive));
+
+
 
             // RoleDto to Role mapping
             CreateMap<RoleDto, Role>()

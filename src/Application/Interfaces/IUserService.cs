@@ -1,5 +1,6 @@
 ﻿// Define la interfaz para operaciones sobre usuarios
 using Application.DTOs;
+using Application.DTOs.User;
 using Domain.Entities;
 using Domain.Errors;
 
