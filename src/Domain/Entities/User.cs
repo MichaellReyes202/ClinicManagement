@@ -43,6 +43,10 @@ public partial class User
 
     public virtual ICollection<User> InverseUpdatedByUser { get; set; } = new List<User>();
 
+    public virtual ICollection<Patient> PatientCreatedByUsers { get; set; } = new List<Patient>();
+
+    public virtual ICollection<Patient> PatientUpdatedByUsers { get; set; } = new List<Patient>();
+
     public virtual User? UpdatedByUser { get; set; }
 
     public virtual ICollection<UserRole> UserRoleCreatedByUsers { get; set; } = new List<UserRole>();

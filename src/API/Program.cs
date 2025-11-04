@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
@@ -83,15 +84,22 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IUserService, UserService>();
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IRoleService, RoleServices>();   
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IEmployesServices, EmployesServices>();
 builder.Services.AddScoped<ISpecialtiesServices, SpecialtiesServices>();
+builder.Services.AddScoped<ICatalogServices, CatalogServices>();
+builder.Services.AddScoped<IPatientServices, PatientServices>();
+
 builder.Services.AddScoped<ISpecialtiesRepository, SpecialtiesRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
 builder.Services.AddScoped<IEmployesRepository, EmployesRepository>();
 builder.Services.AddScoped<IPositionRepository, PositionRepository>();
 builder.Services.AddScoped<IPositionServices, PositionServices>();
+builder.Services.AddScoped<ICatBloodRepository, CatBloodRepository>();
+builder.Services.AddScoped<ISexRepository, SexRepository>();
+builder.Services.AddScoped<IPatientRepository, PatientRepository>();
+
 
 builder.Services.AddHttpContextAccessor();
 
@@ -199,12 +207,12 @@ app.UseHttpsRedirection(); // Ahora va después de UseCors
 app.UseCors("AllowFrontend"); // Mover aquí
 
 
-app.Use(async (context, next) =>
-{
-    Console.WriteLine($"Request incoming: {context.Request.Method} {context.Request.Path}");
-    Console.WriteLine($"Authorization header: {context.Request.Headers["Authorization"].FirstOrDefault() ?? "NO HEADER"}");
-    await next();
-});
+//app.Use(async (context, next) =>
+//{
+//    Console.WriteLine($"Request incoming: {context.Request.Method} {context.Request.Path}");
+//    Console.WriteLine($"Authorization header: {context.Request.Headers["Authorization"].FirstOrDefault() ?? "NO HEADER"}");
+//    await next();
+//});
 
 app.UseAuthentication();
 app.UseAuthorization();

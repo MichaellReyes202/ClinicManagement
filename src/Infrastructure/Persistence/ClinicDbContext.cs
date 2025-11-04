@@ -16,7 +16,15 @@ public partial class ClinicDbContext : DbContext
     {
     }
 
+    public virtual DbSet<CatBloodType> CatBloodTypes { get; set; }
+
+    public virtual DbSet<CatSexo> CatSexos { get; set; }
+
     public virtual DbSet<Employee> Employees { get; set; }
+
+    public virtual DbSet<Patient> Patients { get; set; }
+
+    public virtual DbSet<PatientGuardian> PatientGuardians { get; set; }
 
     public virtual DbSet<Position> Positions { get; set; }
 
@@ -35,8 +43,37 @@ public partial class ClinicDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder
+            .HasPostgresEnum("appointment_status_type", new[] { "Programada", "Confirmada", "Cancelada", "Reprogramada", "Realizada" })
             .HasPostgresExtension("pg_trgm")
             .HasPostgresExtension("uuid-ossp");
+
+        modelBuilder.Entity<CatBloodType>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("cat_blood_types_pkey");
+
+            entity.ToTable("cat_blood_types");
+
+            entity.HasIndex(e => e.Name, "cat_blood_types_name_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(10)
+                .HasColumnName("name");
+        });
+
+        modelBuilder.Entity<CatSexo>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("cat_sexos_pkey");
+
+            entity.ToTable("cat_sexos");
+
+            entity.HasIndex(e => e.Name, "cat_sexos_name_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Name)
+                .HasMaxLength(15)
+                .HasColumnName("name");
+        });
 
         modelBuilder.Entity<Employee>(entity =>
         {
@@ -118,6 +155,113 @@ public partial class ClinicDbContext : DbContext
                 .HasForeignKey<Employee>(d => d.UserId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("employees_user_id_fkey");
+        });
+
+        modelBuilder.Entity<Patient>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("patients_pkey");
+
+            entity.ToTable("patients");
+
+            entity.HasIndex(e => new { e.FirstName, e.LastName }, "idx_patients_name_search")
+                .HasMethod("gin")
+                .HasOperators(new[] { "gin_trgm_ops", "gin_trgm_ops" });
+
+            entity.HasIndex(e => e.ContactEmail, "patients_contact_email_key").IsUnique();
+
+            entity.HasIndex(e => e.Dni, "patients_dni_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Address)
+                .HasMaxLength(255)
+                .HasColumnName("address");
+            entity.Property(e => e.Allergies).HasColumnName("allergies");
+            entity.Property(e => e.BloodTypeId).HasColumnName("blood_type_id");
+            entity.Property(e => e.ChronicDiseases).HasColumnName("chronic_diseases");
+            entity.Property(e => e.ConsultationReasons).HasColumnName("consultation_reasons");
+            entity.Property(e => e.ContactEmail)
+                .HasMaxLength(255)
+                .HasColumnName("contact_email");
+            entity.Property(e => e.ContactPhone)
+                .HasMaxLength(50)
+                .HasColumnName("contact_phone");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at");
+            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
+            entity.Property(e => e.DateOfBirth).HasColumnName("date_of_birth");
+            entity.Property(e => e.Dni)
+                .HasMaxLength(20)
+                .HasColumnName("dni");
+            entity.Property(e => e.FirstName)
+                .HasMaxLength(50)
+                .HasColumnName("first_name");
+            entity.Property(e => e.LastName)
+                .HasMaxLength(50)
+                .HasColumnName("last_name");
+            entity.Property(e => e.MiddleName)
+                .HasMaxLength(50)
+                .HasColumnName("middle_name");
+            entity.Property(e => e.SecondLastName)
+                .HasMaxLength(50)
+                .HasColumnName("second_last_name");
+            entity.Property(e => e.SexId).HasColumnName("sex_id");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedByUserId).HasColumnName("updated_by_user_id");
+
+            entity.HasOne(d => d.BloodType).WithMany(p => p.Patients)
+                .HasForeignKey(d => d.BloodTypeId)
+                .HasConstraintName("patients_blood_type_id_fkey");
+
+            entity.HasOne(d => d.CreatedByUser).WithMany(p => p.PatientCreatedByUsers)
+                .HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("patients_created_by_user_id_fkey");
+
+            entity.HasOne(d => d.Sex).WithMany(p => p.Patients)
+                .HasForeignKey(d => d.SexId)
+                .OnDelete(DeleteBehavior.ClientSetNull)
+                .HasConstraintName("patients_sex_id_fkey");
+
+            entity.HasOne(d => d.UpdatedByUser).WithMany(p => p.PatientUpdatedByUsers)
+                .HasForeignKey(d => d.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("patients_updated_by_user_id_fkey");
+        });
+
+        modelBuilder.Entity<PatientGuardian>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("patient_guardians_pkey");
+
+            entity.ToTable("patient_guardians");
+
+            entity.HasIndex(e => e.PatientId, "idx_guardians_patient_id");
+
+            entity.HasIndex(e => e.PatientId, "patient_guardians_patient_id_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ContactPhone)
+                .HasMaxLength(8)
+                .HasColumnName("contact_phone");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at");
+            entity.Property(e => e.Dni)
+                .HasMaxLength(20)
+                .HasColumnName("dni");
+            entity.Property(e => e.FullName)
+                .HasMaxLength(255)
+                .HasColumnName("full_name");
+            entity.Property(e => e.PatientId).HasColumnName("patient_id");
+            entity.Property(e => e.Relationship)
+                .HasMaxLength(100)
+                .HasColumnName("relationship");
+
+            entity.HasOne(d => d.Patient).WithOne(p => p.PatientGuardian)
+                .HasForeignKey<PatientGuardian>(d => d.PatientId)
+                .HasConstraintName("patient_guardians_patient_id_fkey");
         });
 
         modelBuilder.Entity<Position>(entity =>

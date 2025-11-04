@@ -1,4 +1,5 @@
 ﻿using Application.DTOs.Employee;
+using Application.DTOs.Patient;
 using Application.DTOs.Position;
 using Application.DTOs.Role;
 using Application.DTOs.specialty;
@@ -123,24 +124,113 @@ namespace Application.Mappers
 
             // EmployeeUpdateDto  to  Employee
             CreateMap<EmployesUpdateDto, Employee>()
-           .ForMember(dest => dest.FirstName, opt => opt.MapFrom(src => src.FirstName))
-           .ForMember(dest => dest.MiddleName, opt => opt.MapFrom(src => src.MiddleName))
-           .ForMember(dest => dest.LastName, opt => opt.MapFrom(src => src.LastName))
-           .ForMember(dest => dest.SecondLastName, opt => opt.MapFrom(src => src.SecondLastName))
-           .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age))
-           .ForMember(dest => dest.PositionId, opt => opt.MapFrom(src => src.PositionId))
-           .ForMember(dest => dest.ContactPhone, opt => opt.MapFrom(src => src.ContactPhone))
-           .ForMember(dest => dest.HireDate, opt => opt.MapFrom(src => DateTime.SpecifyKind(src.HireDate, DateTimeKind.Utc)))
-           .ForMember(dest => dest.Dni, opt => opt.MapFrom(src => src.Dni))
-           .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
-           .ForMember(dest => dest.NormalizedEmail,opt => opt.MapFrom(src => src.Email.ToUpper()))
-           .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
-           .ForMember(dest => dest.SpecialtyId, opt => opt.MapFrom(src => src.SpecialtyId))
-           .ForMember(dest => dest.UserId, opt => opt.Ignore())
-           .ForMember(dest => dest.CreatedByUserId, opt => opt.Ignore())
-           .ForMember(dest => dest.UpdatedByUserId, opt => opt.Ignore())
-           .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
-           .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow)); // Se establece manualmente en el servicio
+               .ForMember(dest => dest.FirstName, opt => opt.MapFrom(src => src.FirstName))
+               .ForMember(dest => dest.MiddleName, opt => opt.MapFrom(src => src.MiddleName))
+               .ForMember(dest => dest.LastName, opt => opt.MapFrom(src => src.LastName))
+               .ForMember(dest => dest.SecondLastName, opt => opt.MapFrom(src => src.SecondLastName))
+               .ForMember(dest => dest.Age, opt => opt.MapFrom(src => src.Age))
+               .ForMember(dest => dest.PositionId, opt => opt.MapFrom(src => src.PositionId))
+               .ForMember(dest => dest.ContactPhone, opt => opt.MapFrom(src => src.ContactPhone))
+               .ForMember(dest => dest.HireDate, opt => opt.MapFrom(src => DateTime.SpecifyKind(src.HireDate, DateTimeKind.Utc)))
+               .ForMember(dest => dest.Dni, opt => opt.MapFrom(src => src.Dni))
+               .ForMember(dest => dest.Email, opt => opt.MapFrom(src => src.Email))
+               .ForMember(dest => dest.NormalizedEmail,opt => opt.MapFrom(src => src.Email.ToUpper()))
+               .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => src.IsActive))
+               .ForMember(dest => dest.SpecialtyId, opt => opt.MapFrom(src => src.SpecialtyId))
+               .ForMember(dest => dest.UserId, opt => opt.Ignore())
+               .ForMember(dest => dest.CreatedByUserId, opt => opt.Ignore())
+               .ForMember(dest => dest.UpdatedByUserId, opt => opt.Ignore())
+               .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+               .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
+
+
+            // -------------------------------------- Pacientes  --------------------------------------
+
+            CreateMap<PatientCreateDto, Patient>()
+               .ForMember(dest => dest.FirstName            , opt => opt.MapFrom(src => src.FirstName))
+               .ForMember(dest => dest.MiddleName           , opt => opt.MapFrom(src => src.MiddleName))
+               .ForMember(dest => dest.LastName             , opt => opt.MapFrom(src => src.LastName))
+               .ForMember(dest => dest.SecondLastName       , opt => opt.MapFrom(src => src.SecondLastName))
+               .ForMember(dest => dest.DateOfBirth          , opt => opt.MapFrom(src => src.DateOfBirth))
+               .ForMember(dest => dest.Dni                  , opt => opt.MapFrom(src => src.Dni))
+               .ForMember(dest => dest.ContactPhone         , opt => opt.MapFrom(src => src.ContactPhone))
+               .ForMember(dest => dest.ContactEmail         , opt => opt.MapFrom(src => src.ContactEmail))
+               .ForMember(dest => dest.Address              , opt => opt.MapFrom(src => src.Address))
+               .ForMember(dest => dest.SexId                , opt => opt.MapFrom(src => src.SexId))
+               .ForMember(dest => dest.BloodTypeId          , opt => opt.MapFrom(src => src.BloodTypeId))
+               .ForMember(dest => dest.ConsultationReasons  , opt => opt.MapFrom(src => src.ConsultationReasons))
+               .ForMember(dest => dest.ChronicDiseases      , opt => opt.MapFrom(src => src.ChronicDiseases))
+               .ForMember(dest => dest.Allergies            , opt => opt.MapFrom(src => src.Allergies))
+               .ForMember(dest => dest.CreatedByUserId      , opt => opt.Ignore())
+               .ForMember(dest => dest.UpdatedByUser        , opt => opt.Ignore())
+               .ForMember(dest => dest.PatientGuardian, opt => opt.MapFrom(src =>
+                   src.Guardian != null
+                       ? new PatientGuardian
+                       {
+                           FullName = src.Guardian.FullName,
+                           Dni = src.Guardian.Dni,
+                           Relationship = src.Guardian.Relationship,
+                           ContactPhone = src.Guardian.ContactPhone,
+                           CreatedAt = DateTime.UtcNow
+                       }
+                       : null))
+               .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
+               .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow));
+
+            CreateMap<PatientUpdateDto, Patient>()
+               .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
+               .ForMember(dest => dest.FirstName, opt => opt.MapFrom(src => src.FirstName))
+               .ForMember(dest => dest.MiddleName, opt => opt.MapFrom(src => src.MiddleName))
+               .ForMember(dest => dest.LastName, opt => opt.MapFrom(src => src.LastName))
+               .ForMember(dest => dest.SecondLastName, opt => opt.MapFrom(src => src.SecondLastName))
+               .ForMember(dest => dest.DateOfBirth, opt => opt.MapFrom(src => src.DateOfBirth))
+               .ForMember(dest => dest.Dni, opt => opt.MapFrom(src => src.Dni))
+               .ForMember(dest => dest.ContactPhone, opt => opt.MapFrom(src => src.ContactPhone))
+               .ForMember(dest => dest.ContactEmail, opt => opt.MapFrom(src => src.ContactEmail))
+               .ForMember(dest => dest.Address, opt => opt.MapFrom(src => src.Address))
+               .ForMember(dest => dest.SexId, opt => opt.MapFrom(src => src.SexId))
+               .ForMember(dest => dest.BloodTypeId, opt => opt.MapFrom(src => src.BloodTypeId))
+               .ForMember(dest => dest.ConsultationReasons, opt => opt.MapFrom(src => src.ConsultationReasons))
+               .ForMember(dest => dest.ChronicDiseases, opt => opt.MapFrom(src => src.ChronicDiseases))
+               .ForMember(dest => dest.Allergies, opt => opt.MapFrom(src => src.Allergies))
+               .ForMember(dest => dest.PatientGuardian, opt => opt.Ignore()) // se maneja manualmente en el servicio
+               .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow))
+               .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow));
+
+
+            CreateMap<PatientGuardianDto, PatientGuardian>()
+               .ForMember(dest => dest.FullName, opt => opt.MapFrom(src => src.FullName))
+               .ForMember(dest => dest.Dni, opt => opt.MapFrom(src => src.Dni))
+               .ForMember(dest => dest.Relationship, opt => opt.MapFrom(src => src.Relationship))
+               .ForMember(dest => dest.ContactPhone, opt => opt.MapFrom(src => src.ContactPhone))
+               .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(_ => DateTime.UtcNow));
+
+            CreateMap<Patient , PatientResponseDto>()
+                .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.Id))
+                .ForMember(dest => dest.FirstName, opt => opt.MapFrom(src => src.FirstName))
+                .ForMember(dest => dest.MiddleName, opt => opt.MapFrom(src => src.MiddleName))
+                .ForMember(dest => dest.LastName, opt => opt.MapFrom(src => src.LastName))
+                .ForMember(dest => dest.SecondLastName, opt => opt.MapFrom(src => src.SecondLastName))
+                .ForMember(dest => dest.DateOfBirth, opt => opt.MapFrom(src => src.DateOfBirth))
+                .ForMember(dest => dest.Dni, opt => opt.MapFrom(src => src.Dni))
+                .ForMember(dest => dest.ContactPhone, opt => opt.MapFrom(src => src.ContactPhone))
+                .ForMember(dest => dest.ContactEmail, opt => opt.MapFrom(src => src.ContactEmail))
+                .ForMember(dest => dest.Address, opt => opt.MapFrom(src => src.Address))
+                .ForMember(dest => dest.SexId, opt => opt.MapFrom(src => src.SexId))
+                .ForMember(dest => dest.BloodTypeId, opt => opt.MapFrom(src => src.BloodTypeId))
+                .ForMember(dest => dest.ConsultationReasons, opt => opt.MapFrom(src => src.ConsultationReasons))
+                .ForMember(dest => dest.ChronicDiseases, opt => opt.MapFrom(src => src.ChronicDiseases))
+                .ForMember(dest => dest.Allergies, opt => opt.MapFrom(src => src.Allergies))
+                .ForMember(dest => dest.Guardian, opt => opt.MapFrom(src =>
+                     src.PatientGuardian != null
+                          ? new PatientGuardianDto
+                          {
+                            FullName = src.PatientGuardian.FullName,
+                            Dni = src.PatientGuardian.Dni,
+                            Relationship = src.PatientGuardian.Relationship,
+                            ContactPhone = src.PatientGuardian.ContactPhone
+                          }
+                          : null));
 
         }
     }

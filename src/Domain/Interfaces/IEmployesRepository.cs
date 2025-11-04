@@ -9,7 +9,6 @@ namespace Domain.Interfaces
 {
     public interface IEmployesRepository : IGenericRepository<Employee>
     {
-        // GetEmployeeWithUserAsync
         Task<Employee?> GetEmployeeWithUserAsync(int id);
 
         // Actualizar Employee

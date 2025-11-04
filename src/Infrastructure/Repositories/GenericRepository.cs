@@ -23,6 +23,21 @@ namespace Infrastructure.Repositories
             _context = dbContext;
             dbSet = _context.Set<T>();
         }
+        public async Task<IQueryable<T>> GetQuery(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IQueryable<T>>? include = null)
+        {
+            IQueryable<T> query = dbSet;
+
+            if (include != null)
+            {
+                query = include(query);
+            }
+
+            if (filter != null)
+            {
+                query = query.Where(filter);
+            }
+            return query;
+        }
 
         public async Task<(IQueryable<T> query, int totalItems)> GetQueryAndTotal( Expression<Func<T, bool>>? filter = null,Func<IQueryable<T>, IQueryable<T>>? include = null)
         {

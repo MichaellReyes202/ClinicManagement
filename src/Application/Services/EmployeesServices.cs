@@ -126,88 +126,6 @@ public class EmployesServices : IEmployesServices
         }
     }
 
-    // Actualiza empleado 
-    public async Task<Result> UpdateEmployesAsync(EmployesUpdateDto dto, int employeeId)
-    {
-        var valitationResult = await _updateValidator.ValidateAsync(dto);
-        if (!valitationResult.IsValid)
-        {
-            var errors = valitationResult.Errors
-                .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
-                .ToList();
-            return Result.Failure(errors);
-        }
-        try
-        {
-            using var transacion = await _employeesRepository.BeginTransactionAsync();
-            try
-            {
-                var userOnly = await _userService.GetCurrentUserAsync();
-
-                var employe = await _employeesRepository.GetByIdAsync(employeeId);
-                if (employe is null)
-                    return Result.Failure(new Error(ErrorCodes.NotFound, $"Employee with ID '{employeeId}' does not exist."));
-
-                // verificar que el id del dto no sea diferente a id del parametro
-                if (dto.Id != employeeId) return Result.Failure(new Error(ErrorCodes.BadRequest, $"The employee {employeeId} in the route does not match the ID sent in the request body {dto.Id}"));
-
-                // verificar que el nuevo email enviado otro usuario no lo tenga en uso 
-                var verifyEmail = await _employeesRepository.ExistAsync(e => e.NormalizedEmail == dto.Email.ToUpper() && e.Id != employeeId);
-                if (verifyEmail)
-                    return Result.Failure(new Error(ErrorCodes.Conflict, "The email provided is already in use by another employee.", "email"));
-
-                // verificar que la nueva cedula enviado no este registrada en otro usuarios
-                var verifyDni = await _employeesRepository.ExistAsync(e => e.Dni == dto.Dni.ToUpper() && e.Id != employeeId);
-                if (verifyDni)
-                    return Result.Failure(new Error(ErrorCodes.Conflict, "The ID number provided is already in use by another employee.", "dni"));
-
-
-                // TODO : Falta validar que la edad concuerde con la cedula y formato del dni 
-
-
-                // Verificar que la especialidad existe ( si es que se mando una )
-                if (dto.SpecialtyId.HasValue)
-                {
-                    var specialtyExists = await _specialtiesRepository.GetByIdAsync(dto.SpecialtyId.Value) != null;
-                    if (!specialtyExists)
-                        return Result.Failure(new Error(ErrorCodes.NotFound, $"The specialty with ID '{dto.SpecialtyId.Value}' does not exist."));
-                }
-                var positionExists = await _positionRepository.GetByIdAsync(dto.PositionId) != null;
-                if (!positionExists)
-                    return Result.Failure(new Error(ErrorCodes.NotFound, $"The position with ID '{dto.PositionId}' does not exist."));
-
-
-
-                // Verificar si deshabilito el empleado , se tiene que deshabilitar el usuario ( si es que lo esta)
-                if (employe.UserId.HasValue && employe.UserId > 0)
-                {
-                    var userAssigned = await _userRepository.GetByIdAsync((int)employe.UserId);
-                    if (userAssigned != null)
-                    {
-                        userAssigned.IsActive = false;
-                        await _userRepository.UpdateAsync(userAssigned);
-                    }
-                }
-
-                // mapear del dto a la entidad empleado 
-                _mapper.Map(dto, employe);
-                employe.UpdatedByUserId = userOnly!.Id;
-                await _employeesRepository.UpdateEmployeeAsync(employe);
-                await _employeesRepository.SaveChangesAsync();
-                await transacion.CommitAsync();
-                return Result.Success();
-            }
-            catch (DbUpdateException ex)
-            {
-                await transacion.RollbackAsync();
-                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"Un conflicto de datos único ha ocurrido. {ex.Message} "));
-            }
-        }
-        catch (Exception ex)
-        {
-            return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
-        }
-    }
 
     // Agregar un nuevo empleado 
     public async Task<Result<EmployeReponseDto>> AddEmployesAsync(EmployesCreationDto employes)
@@ -277,5 +195,91 @@ public class EmployesServices : IEmployesServices
             return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
         }
     }
+ 
 
+    // Actualiza empleado 
+    public async Task<Result> UpdateEmployesAsync(EmployesUpdateDto dto, int employeeId)
+    {
+        var valitationResult = await _updateValidator.ValidateAsync(dto);
+        if (!valitationResult.IsValid)
+        {
+            var errors = valitationResult.Errors
+                .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
+                .ToList();
+            return Result.Failure(errors);
+        }
+        try
+        {
+            using var transacion = await _employeesRepository.BeginTransactionAsync();
+            try
+            {
+                var userOnly = await _userService.GetCurrentUserAsync();
+
+                var employe = await _employeesRepository.GetByIdAsync(employeeId);
+                if (employe is null)
+                    return Result.Failure(new Error(ErrorCodes.NotFound, $"Employee with ID '{employeeId}' does not exist."));
+
+                // verificar que el id del dto no sea diferente a id del parametro
+                if (dto.Id != employeeId) 
+                    return Result.Failure(new Error(ErrorCodes.BadRequest, $"The employee {employeeId} in the route does not match the ID sent in the request body {dto.Id}"));
+
+                // verificar que el nuevo email enviado otro usuario no lo tenga en uso 
+                var verifyEmail = await _employeesRepository.ExistAsync(e => e.NormalizedEmail == dto.Email.ToUpper() && e.Id != employeeId);
+                if (verifyEmail)
+                    return Result.Failure(new Error(ErrorCodes.Conflict, "The email provided is already in use by another employee.", "email"));
+
+                // verificar que la nueva cedula enviado no este registrada en otro usuarios
+                var verifyDni = await _employeesRepository.ExistAsync(e => e.Dni == dto.Dni.ToUpper() && e.Id != employeeId);
+                if (verifyDni)
+                    return Result.Failure(new Error(ErrorCodes.Conflict, "The ID number provided is already in use by another employee.", "dni"));
+
+
+                // TODO : Falta validar que la edad concuerde con la cedula y formato del dni 
+
+
+                // Verificar que la especialidad existe ( si es que se mando una )
+                if (dto.SpecialtyId.HasValue)
+                {
+                    var specialtyExists = await _specialtiesRepository.GetByIdAsync(dto.SpecialtyId.Value) != null;
+                    if (!specialtyExists)
+                        return Result.Failure(new Error(ErrorCodes.NotFound, $"The specialty with ID '{dto.SpecialtyId.Value}' does not exist."));
+                }
+                var positionExists = await _positionRepository.GetByIdAsync(dto.PositionId) != null;
+                if (!positionExists)
+                    return Result.Failure(new Error(ErrorCodes.NotFound, $"The position with ID '{dto.PositionId}' does not exist."));
+
+
+
+                // Verificar si deshabilito el empleado , se tiene que deshabilitar el usuario ( si es que lo esta)
+                if (employe.UserId.HasValue && employe.UserId > 0)
+                {
+                    var userAssigned = await _userRepository.GetByIdAsync((int)employe.UserId);
+                    if (userAssigned != null)
+                    {
+                        userAssigned.IsActive = false;
+                        await _userRepository.UpdateAsync(userAssigned);
+                    }
+                }
+
+                // mapear del dto a la entidad empleado 
+                _mapper.Map(dto, employe);
+                employe.UpdatedByUserId = userOnly!.Id;
+                await _employeesRepository.UpdateEmployeeAsync(employe);
+                await _employeesRepository.SaveChangesAsync();
+                await transacion.CommitAsync();
+                return Result.Success();
+            }
+            catch (DbUpdateException ex)
+            {
+                await transacion.RollbackAsync();
+                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"Un conflicto de datos único ha ocurrido. {ex.Message} "));
+            }
+        }
+        catch (Exception ex)
+        {
+            return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
+        }
+    }
+
+    
 }
