@@ -17,64 +17,64 @@ public class PatientCreateValidator : AbstractValidator<PatientCreateDto>
     public PatientCreateValidator()
     {
         RuleFor(x => x.FirstName)
-            .NotEmpty().WithMessage("El nombre es requerido")
-            .MinimumLength(2).WithMessage("El nombre debe tener al menos 2 caracteres")
-            .MaximumLength(100).WithMessage("El nombre no puede exceder 100 caracteres")
-            .Matches(nameRegex).WithMessage("El nombre solo puede contener letras, incluyendo acentos");
+            .NotEmpty().WithMessage("The name is required")
+            .MinimumLength(2).WithMessage("The name must have at least 2 characters")
+            .MaximumLength(100).WithMessage("The name cannot exceed 100 characters")
+            .Matches(nameRegex).WithMessage("The name can only contain letters, including accents");
 
         RuleFor(x => x.MiddleName)
-            .MaximumLength(100).WithMessage("El segundo nombre no puede exceder 100 caracteres")
-            .Matches(@"^[a-zA-ZÀ-ÿ\s]*$").WithMessage("El segundo nombre solo puede contener letras, incluyendo acentos")
+            .MaximumLength(100).WithMessage("The middle name cannot exceed 100 characters")
+            .Matches(@"^[a-zA-ZÀ-ÿ\s]*$").WithMessage("The middle name can only contain letters, including accents")
             .When(x => !string.IsNullOrEmpty(x.MiddleName));
 
         RuleFor(x => x.LastName)
-            .NotEmpty().WithMessage("El apellido es requerido")
-            .MinimumLength(2).WithMessage("El apellido debe tener al menos 2 caracteres")
-            .MaximumLength(100).WithMessage("El apellido no puede exceder 100 caracteres")
-            .Matches(nameRegex).WithMessage("El apellido solo puede contener letras, incluyendo acentos");
+            .NotEmpty().WithMessage("The last name is required")
+            .MinimumLength(2).WithMessage("The last name must have at least 2 characters")
+            .MaximumLength(100).WithMessage("The last name cannot exceed 100 characters")
+            .Matches(nameRegex).WithMessage("The last name can only contain letters, including accents");
 
         RuleFor(x => x.SecondLastName)
-            .MaximumLength(100).WithMessage("El segundo apellido no puede exceder 100 caracteres")
-            .Matches(@"^[a-zA-ZÀ-ÿ\s]*$").WithMessage("El segundo apellido solo puede contener letras, incluyendo acentos")
+            .MaximumLength(100).WithMessage("The second surname cannot exceed 100 characters")
+            .Matches(@"^[a-zA-ZÀ-ÿ\s]*$").WithMessage("The second surname can only contain letters, including accents")
             .When(x => !string.IsNullOrEmpty(x.SecondLastName));
 
         RuleFor(x => x.DateOfBirth)
-            .LessThan(DateOnly.FromDateTime(DateTime.Now)).WithMessage("La fecha de nacimiento debe ser anterior a hoy");
+            .LessThan(DateOnly.FromDateTime(DateTime.Now)).WithMessage("The date of birth must be before today");
 
         RuleFor(x => x.Dni)
             .Must(dni => string.IsNullOrEmpty(dni) || nicaraguaCedulaRegex.IsMatch(dni))
-            .WithMessage("La cédula debe tener el formato 000-000000-0000A");
+            .WithMessage("The ID must have the format 000-000000-0000A");
 
         RuleFor(x => x.ContactPhone)
-            .Matches(phoneRegex).WithMessage("El teléfono debe tener exactamente 8 dígitos numéricos")
+            .Matches(phoneRegex).WithMessage("The phone number must have exactly 8 numeric digits")
             .When(x => !string.IsNullOrEmpty(x.ContactPhone));
 
         RuleFor(x => x.ContactEmail)
-            .EmailAddress().WithMessage("El correo debe ser válido")
-            .MaximumLength(255).WithMessage("El correo no puede exceder 255 caracteres")
+            .EmailAddress().WithMessage("The email must be valid")
+            .MaximumLength(255).WithMessage("The email cannot exceed 255 characters")
             .When(x => !string.IsNullOrEmpty(x.ContactEmail));
 
         RuleFor(x => x.Address)
-            .MaximumLength(500).WithMessage("La dirección no puede exceder 500 caracteres")
+            .MaximumLength(500).WithMessage("The address cannot exceed 500 characters")
             .When(x => !string.IsNullOrEmpty(x.Address));
 
         RuleFor(x => x.SexId)
-            .NotNull().WithMessage("El sexo es requerido");
+            .NotNull().WithMessage("Sex is required");
 
         RuleFor(x => x.BloodTypeId)
-            .GreaterThan(0).WithMessage("El tipo de sangre debe ser un número válido")
+            .GreaterThan(0).WithMessage("The blood type must be a valid number")
             .When(x => x.BloodTypeId.HasValue);
 
         RuleFor(x => x.ConsultationReasons)
-            .MaximumLength(1000).WithMessage("Los motivos de la consulta no pueden exceder 1000 caracteres")
+            .MaximumLength(1000).WithMessage("The reasons for the consultation cannot exceed 1000 characters")
             .When(x => !string.IsNullOrEmpty(x.ConsultationReasons));
 
         RuleFor(x => x.ChronicDiseases)
-            .MaximumLength(1000).WithMessage("Las enfermedades crónicas no pueden exceder 1000 caracteres")
+            .MaximumLength(1000).WithMessage("Chronic diseases cannot exceed 1000 characters")
             .When(x => !string.IsNullOrEmpty(x.ChronicDiseases));
 
         RuleFor(x => x.Allergies)
-            .MaximumLength(1000).WithMessage("Las alergias no pueden exceder 1000 caracteres")
+            .MaximumLength(1000).WithMessage("Allergies cannot exceed 1000 characters")
             .When(x => !string.IsNullOrEmpty(x.Allergies));
 
         // Validación del tutor
@@ -103,7 +103,7 @@ public class PatientCreateValidator : AbstractValidator<PatientCreateDto>
 
                 return true;
             })
-            .WithMessage("La cédula no coincide con la fecha de nacimiento (DDMMAA)")
+            .WithMessage("The ID does not match the date of birth (DDMMYY)")
             .WithName(x => nameof(x.DateOfBirth));
         // Validar que si no se registro el tutor, el paciente debe ser mayor de edad
         RuleFor(x => x)

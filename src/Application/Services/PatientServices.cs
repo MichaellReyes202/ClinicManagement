@@ -228,7 +228,7 @@ public class PatientServices : IPatientServices
             catch (DbUpdateException ex)
             {
                 await transacion.RollbackAsync();
-                return Result<PatientResponseDto>.Failure(new Error(ErrorCodes.Conflict, "Un conflicto de datos único ha ocurrido. Intente de nuevo."));
+                return Result<PatientResponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
             }
 
         }
@@ -325,7 +325,7 @@ public class PatientServices : IPatientServices
             catch (DbUpdateException ex)
             {
                 await transacion.RollbackAsync();
-                return Result.Failure(new Error(ErrorCodes.Conflict, "Un conflicto de datos único ha ocurrido. Intente de nuevo."));
+                return Result.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
             }
 
         }

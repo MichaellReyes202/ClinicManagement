@@ -85,7 +85,7 @@ namespace Infrastructure.Store
 
             if (string.IsNullOrEmpty(userName))
             {
-                throw new ArgumentException("El nombre de usuario no puede ser nulo o vacío.", nameof(userName));
+                throw new ArgumentException("The username cannot be null or empty.", nameof(userName));
             }
 
             user.Email = userName;
