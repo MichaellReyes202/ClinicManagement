@@ -105,6 +105,21 @@ public class PatientCreateValidator : AbstractValidator<PatientCreateDto>
             })
             .WithMessage("La cédula no coincide con la fecha de nacimiento (DDMMAA)")
             .WithName(x => nameof(x.DateOfBirth));
+        // Validar que si no se registro el tutor, el paciente debe ser mayor de edad
+        RuleFor(x => x)
+            .Must(x =>
+            {
+                if (x.Guardian == null)
+                {
+                    var today = DateOnly.FromDateTime(DateTime.Now);
+                    int age = today.Year - x.DateOfBirth.Year;
+                    if (x.DateOfBirth > today.AddYears(-age)) age--;
+                    return age >= 18;
+                }
+                return true;
+            })
+            .WithMessage("El paciente debe ser mayor de edad si no se registra un tutor.")
+        .   WithName(x => nameof(x.DateOfBirth));
     }
 
 }

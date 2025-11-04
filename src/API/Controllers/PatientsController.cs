@@ -55,6 +55,31 @@ public class PatientsController : ControllerBase
         };
     }
 
+    [HttpGet("search")]
+    [Authorize]
+    public async Task<IActionResult> Search([FromQuery] PaginationDto pagination)
+    {
+        var result = await _patientServices.EmployeesWithoutUsers(pagination);
+        if (result.IsSuccess)
+        {
+            return Ok(new
+            {
+                count = result.Value?.Count,
+                pages = result.Value?.Pages,
+                EmployeeListSearchDto = result.Value?.Items
+            });
+        }
+        return result.Error?.Code switch
+        {
+            ErrorCodes.BadRequest => BadRequest(result.Error),
+            ErrorCodes.Conflict => Conflict(result.Error),
+            ErrorCodes.NotFound => NotFound(result.Error),
+            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+        };
+    }
+
+
     //Agregar un nuevo paciente
     [Authorize]
     [HttpPost("createPatient")]

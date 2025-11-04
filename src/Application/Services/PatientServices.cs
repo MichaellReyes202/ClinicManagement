@@ -38,6 +38,40 @@ public class PatientServices : IPatientServices
 
         _mapper = mapper;
     }
+
+    public async Task<Result<PaginatedResponseDto<PatientSearchDto>>> EmployeesWithoutUsers(PaginationDto pagination)
+    {
+        var searchTerm = pagination.Query?.Trim().ToLower();
+        Expression<Func<Patient, bool>> searchFilter = null;
+
+        if (!string.IsNullOrEmpty(searchTerm))
+        {
+            searchFilter = e =>
+                (e.FirstName.ToLower().Contains(searchTerm) || // Solo el primer nombre
+                (e.MiddleName != null && e.MiddleName.ToLower().Contains(searchTerm)) || // Si existe, el segundo nombre
+                 e.LastName.ToLower().Contains(searchTerm) || // Apellido
+                 (e.SecondLastName != null && e.SecondLastName.ToLower().Contains(searchTerm)) ||
+                 (e.Dni != null && e.Dni.ToLower().Contains(searchTerm)));
+        }
+        var (baseQuery, total) = await _patientRepository.GetQueryAndTotal( filter: searchFilter);
+        var projectQuery = baseQuery
+            .AsNoTracking()
+            .Select(e => new PatientSearchDto
+            {
+                Id = e.Id,
+                FullName = (e.FirstName + " " + (e.MiddleName != null ? e.MiddleName + " " : "") + e.LastName + " " + (e.SecondLastName != null ? e.SecondLastName : "")).Trim(),
+                Dni = e.Dni ?? string.Empty  ,
+                ContactPhone = e.ContactPhone ?? string.Empty,
+            });
+        var items = await projectQuery
+            .Skip(pagination.Offset)
+            .Take(pagination.Limit)
+            .ToListAsync();
+
+        var paginatedResponse = new PaginatedResponseDto<EmployeeSearchDto>(total, items);
+        return Result<PaginatedResponseDto<PatientSearchDto>>.Success(paginatedResponse);
+    }
+
     public async Task<Result<PaginatedResponseDto<PatientResponseDto>>> GetAllPatients(PaginationDto pagination)
     {
         try
