@@ -148,12 +148,12 @@ public class EmployesServices : IEmployesServices
                 // Verificar Email 
                 var existingEmail = await _employeesRepository.ExistAsync(c => c.NormalizedEmail == employes.Email.ToUpper());
                 if (existingEmail)
-                    return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"El correo electrónico '{employes.Email}' ya existe.", "email"));
+                    return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"The email '{employes.Email}' It already exists.", "email"));
 
                 var existingDni = await _employeesRepository.ExistAsync(c => c.Dni == employes.Dni!.ToUpper());
                 if (existingDni)
                     // Usamos el constructor con campo para el error 409
-                    return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"El número de cédula '{employes.Dni}' ya existe.", "dni"));
+                    return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"The ID number '{employes.Dni}' It already exists.", "dni"));
 
                 // TODO : Falta validar que la edad concuerde con la del dni
 
@@ -186,7 +186,7 @@ public class EmployesServices : IEmployesServices
             catch (DbUpdateException ex)
             {
                 await transacion.RollbackAsync();
-                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, "Un conflicto de datos único ha ocurrido. Intente de nuevo."));
+                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
             }
 
         }
@@ -272,7 +272,7 @@ public class EmployesServices : IEmployesServices
             catch (DbUpdateException ex)
             {
                 await transacion.RollbackAsync();
-                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"Un conflicto de datos único ha ocurrido. {ex.Message} "));
+                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"A unique data conflict has occurred. {ex.Message} "));
             }
         }
         catch (Exception ex)

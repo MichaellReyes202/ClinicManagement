@@ -8,7 +8,7 @@ public class EmployesUpdateDtoValidator : AbstractValidator<EmployesUpdateDto>
     {
         RuleFor(x => x.Id)
         .GreaterThan(0)
-        .WithMessage("El Id debe ser mayor que cero.");
+        .WithMessage("The Id must be greater than zero.");
 
         // FirstName
         RuleFor(x => x.FirstName)
