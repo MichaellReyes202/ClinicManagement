@@ -1,9 +1,7 @@
 ﻿using Domain.Entities;
 
-namespace Domain.Interfaces
+namespace Domain.Interfaces;
+public interface IPatientRepository : IGenericRepository<Patient>
 {
-    public interface IPatientRepository : IGenericRepository<Patient>
-    {
-        Task UpdatePatientAsync(Patient employee);
-    }
+    Task UpdatePatientAsync(Patient employee);
 }

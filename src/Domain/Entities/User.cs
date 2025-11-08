@@ -31,6 +31,14 @@ public partial class User
 
     public DateTime? LockoutEnd { get; set; }
 
+    public virtual ICollection<Appointment> AppointmentCreatedByUsers { get; set; } = new List<Appointment>();
+
+    public virtual ICollection<Appointment> AppointmentUpdatedByUsers { get; set; } = new List<Appointment>();
+
+    public virtual ICollection<Consultation> ConsultationCreatedByUsers { get; set; } = new List<Consultation>();
+
+    public virtual ICollection<Consultation> ConsultationUpdatedByUsers { get; set; } = new List<Consultation>();
+
     public virtual User? CreatedByUser { get; set; }
 
     public virtual ICollection<Employee> EmployeeCreatedByUsers { get; set; } = new List<Employee>();
@@ -38,6 +46,10 @@ public partial class User
     public virtual ICollection<Employee> EmployeeUpdatedByUsers { get; set; } = new List<Employee>();
 
     public virtual Employee? EmployeeUser { get; set; }
+
+    public virtual ICollection<ExamType> ExamTypeCreatedByUsers { get; set; } = new List<ExamType>();
+
+    public virtual ICollection<ExamType> ExamTypeUpdatedByUsers { get; set; } = new List<ExamType>();
 
     public virtual ICollection<User> InverseCreatedByUser { get; set; } = new List<User>();
 

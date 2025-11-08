@@ -7,13 +7,17 @@ public partial class Appointment
 {
     public int Id { get; set; }
 
+    public int? PatientId { get; set; }
+
     public int? EmployeeId { get; set; }
 
-    public string AppointmentType { get; set; } = null!;
+    public DateTime StartTime { get; set; }
 
-    public DateTime DateTime { get; set; }
+    public int Duration { get; set; }
 
-    public TimeSpan? Duration { get; set; }
+    public DateTime? EndTime { get; set; }
+
+    public int StatusId { get; set; }
 
     public string? Reason { get; set; }
 
@@ -21,5 +25,17 @@ public partial class Appointment
 
     public DateTime UpdatedAt { get; set; }
 
+    public int? CreatedByUserId { get; set; }
+
+    public int? UpdatedByUserId { get; set; }
+
+    public virtual User? CreatedByUser { get; set; }
+
     public virtual Employee? Employee { get; set; }
+
+    public virtual Patient? Patient { get; set; }
+
+    public virtual CatAppointmentStatus Status { get; set; } = null!;
+
+    public virtual User? UpdatedByUser { get; set; }
 }

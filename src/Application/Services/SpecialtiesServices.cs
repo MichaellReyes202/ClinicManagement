@@ -1,12 +1,15 @@
 ﻿using Application.DTOs;
+using Application.DTOs.ExamType;
+using Application.DTOs.Patient;
+using Application.DTOs.specialty;
+using Application.DTOs.Specialty;
 using Application.Interfaces;
 using AutoMapper;
+using Domain.Entities;
 using Domain.Errors;
 using Domain.Interfaces;
 using FluentValidation;
-using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using Application.DTOs.specialty;
 
 namespace Application.Services;
 
@@ -43,6 +46,67 @@ public class SpecialtiesServices : ISpecialtiesServices
         }).ToList();
         return options;
     }
+
+    public async Task<Result<PaginatedResponseDto<ExamsBySpecialtyListDto>>> GetExamsBySpecialty(PaginationDto pagination)
+    {
+        var (baseQuery, total) = await _specialtiesRepository.GetQueryAndTotal(include: q => q.Include(e => e.ExamTypes));
+
+        var projectedQuery = baseQuery
+                .AsNoTracking()
+                .Select(e => new ExamsBySpecialtyListDto
+                {
+                    Id= e.Id,
+                    Name= e.Name,
+                    Description = e.Description,
+                    ExamTypes = e.ExamTypes.Select(p => new ExamTypeListDto
+                    {
+                        Id = p.Id,
+                        Name = p.Name,
+                        Description = p.Description,
+                        DeliveryTime = p.DeliveryTime,
+                        IsActive = p.IsActive,
+                        PricePaid = p.PricePaid,
+                        SpecialtyId = p.SpecialtyId,
+                        SpecialtyName = e.Name
+                    }).ToList(),
+                });
+        var items = await projectedQuery
+               .Skip(pagination.Offset)
+               .Take(pagination.Limit)
+               .ToListAsync();
+
+        var paginatedResponse = new PaginatedResponseDto<ExamsBySpecialtyListDto>(total, items);
+        return Result<PaginatedResponseDto<ExamsBySpecialtyListDto>>.Success(paginatedResponse);
+    }
+    public async Task< Result< List<DoctorBySpecialtyDto>>  > GetDoctorBySpecialty(PaginationDto pagination)
+    {
+        var baseQuery = await _specialtiesRepository.GetQuery(include: q => q.Include(e => e.Employees));
+
+        var projectedQuery = baseQuery
+            .AsNoTracking()
+            .Select(e => new DoctorBySpecialtyDto
+            {
+                Id = e.Id,
+                Name = e.Name,
+                Doctors = e.Employees
+                    //.Where(emp => emp.PositionId == 1 && emp.IsActive == true) // <-- Filtro correcto
+                    .Select(emp => new OptionDto
+                    {
+                        Id = emp.Id,
+                        Name = emp.FirstName + " " + (emp.MiddleName ?? "") + " " + emp.LastName + " " +  (emp.SecondLastName ?? "")
+                    })
+                    .ToList()
+            });
+
+        var items = await projectedQuery
+           .Skip(pagination.Offset)
+           .Take(pagination.Limit)
+           .ToListAsync();
+
+        return Result<List<DoctorBySpecialtyDto>>.Success(items);
+    }
+
+
     public async Task<Result<PaginatedResponseDto<SpecialtyListDto>>> GetAllSpecialties(PaginationDto pagination)
     {
         try

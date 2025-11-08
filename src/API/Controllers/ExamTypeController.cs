@@ -1,7 +1,7 @@
 ﻿
-
 using Application.DTOs;
 using Application.DTOs.Employee;
+using Application.DTOs.ExamType;
 using Application.DTOs.Patient;
 using Application.Interfaces;
 using Application.Services;
@@ -12,14 +12,14 @@ using Microsoft.AspNetCore.Mvc;
 namespace API.Controllers;
 
 [ApiController]
-[Route("api/patients")]
-public class PatientsController : ControllerBase
+[Route("api/examType")]
+public class ExamTypeController : ControllerBase
 {
-    private readonly IPatientServices _patientServices;
+    private readonly IExamTypeServices _examTypeServices;
 
-    public PatientsController(IPatientServices patientServices)
+    public ExamTypeController(IExamTypeServices examTypeServices)
     {
-        _patientServices = patientServices;
+        _examTypeServices = examTypeServices;
     }
     [HttpGet]
     [Authorize]
@@ -27,7 +27,7 @@ public class PatientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Get([FromQuery] PaginationDto pagination)
     {
-        var result = await _patientServices.GetAllPatients(pagination);
+        var result = await _examTypeServices.GetAll(pagination);
         if (result.IsSuccess)
         {
             return Ok(new
@@ -54,44 +54,20 @@ public class PatientsController : ControllerBase
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
         };
     }
-
-    [HttpGet("search")]
+   
     [Authorize]
-    public async Task<IActionResult> Search([FromQuery] PaginationDto pagination)
-    {
-        var result = await _patientServices.SearchPatient(pagination);
-        if (result.IsSuccess)
-        {
-            return Ok(new
-            {
-                count = result.Value?.Count,
-                pages = result.Value?.Pages,
-                items = result.Value?.Items
-            });
-        }
-        return result.Error?.Code switch
-        {
-            ErrorCodes.BadRequest => BadRequest(result.Error),
-            ErrorCodes.Conflict => Conflict(result.Error),
-            ErrorCodes.NotFound => NotFound(result.Error),
-            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
-        };
-    }
-
-    [Authorize]
-    [HttpPost("createPatient")]
+    [HttpPost("createExamType")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> CreateEmployee(PatientCreateDto patient)
+    public async Task<IActionResult> CreateEmployee(ExamTypeCreateDto patient)
     {
-        var result = await _patientServices.AddPatientAsync(patient);
+        var result = await _examTypeServices.Add(patient);
 
         if (result.IsSuccess)
         {
-            return Ok(result.Value);
+            return CreatedAtAction(nameof(GetExamType), new { id = result.Value!.Id }, result.Value);
         }
         if (result.ValidationErrors.Count > 0)
         {
@@ -112,15 +88,23 @@ public class PatientsController : ControllerBase
 
     }
 
-    // obtener el empleador por el id 
-    [HttpGet("{id:int}", Name = "GetPatient")]
+
+    [HttpGet("{id:int}", Name = "GetExamType")]
     [Authorize]
-    public async Task<ActionResult<EmployeReponseDto>> Get(int Id)
+    public async Task<ActionResult<EmployeReponseDto>> GetExamType(int Id)
     {
-        var result = await _patientServices.GetPatientById(Id);
+        var result = await _examTypeServices.GetById(Id);
         if (result.IsSuccess)
         {
             return Ok(result.Value);
+        }
+        if (result.ValidationErrors.Count > 0)
+        {
+            return BadRequest(new
+            {
+                message = "One or more validation errors have occurred in the provided fields.",
+                errors = result.ValidationErrors
+            });
         }
         return result.Error?.Code switch
         {
@@ -140,9 +124,9 @@ public class PatientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
 
-    public async Task<IActionResult> UpdateEmployee([FromBody] PatientUpdateDto dto, int Id)
+    public async Task<IActionResult> UpdateEmployee([FromBody] ExamTypeUpdateDto dto, int Id)
     {
-        var result = await _patientServices.UpdatePatientAsync(dto, Id);
+        var result = await _examTypeServices.Update(dto, Id);
         if (result.IsSuccess)
         {
             return NoContent();
@@ -164,5 +148,4 @@ public class PatientsController : ControllerBase
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
         };
     }
-
 }

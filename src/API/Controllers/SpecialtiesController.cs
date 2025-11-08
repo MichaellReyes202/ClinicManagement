@@ -1,5 +1,6 @@
 ﻿
 using Application.DTOs;
+using Application.DTOs.ExamType;
 using Application.DTOs.specialty;
 using Application.Interfaces;
 using Domain.Entities;
@@ -46,6 +47,59 @@ public class SpecialtiesController : ControllerBase
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
         };
     }
+    [HttpGet("examsBySpecialty")]
+    [Authorize]
+    public async Task<ActionResult<Result<PaginatedResponseDto<SpecialtyListDto>>>> ExamsBySpecialty([FromQuery] PaginationDto pagination)
+    {
+        var result = await _specialtiesServices.GetExamsBySpecialty(pagination);
+        if (result.IsSuccess)
+        {
+            return Ok(result.Value);
+        }
+        if (result.ValidationErrors.Count > 0)
+        {
+            return BadRequest(new
+            {
+                message = "One or more validation errors have occurred in the provided fields.",
+                errors = result.ValidationErrors
+            });
+        }
+        return result.Error?.Code switch
+        {
+            ErrorCodes.BadRequest => BadRequest(result.Error),
+            ErrorCodes.Conflict => Conflict(result.Error),
+            ErrorCodes.NotFound => NotFound(result.Error),
+            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+        };
+    }
+    [HttpGet("doctorsBySpecialty")]
+    [Authorize]
+    public async Task<ActionResult<List<DoctorBySpecialtyDto>>> DoctorsBySpecialty([FromQuery] PaginationDto pagination)
+    {
+        var result = await _specialtiesServices.GetDoctorBySpecialty(pagination);
+        if (result.IsSuccess)
+        {
+            return result.Value!;
+        }
+        if (result.ValidationErrors.Count > 0)
+        {
+            return BadRequest(new
+            {
+                message = "One or more validation errors have occurred in the provided fields.",
+                errors = result.ValidationErrors
+            });
+        }
+        return result.Error?.Code switch
+        {
+            ErrorCodes.BadRequest => BadRequest(result.Error),
+            ErrorCodes.Conflict => Conflict(result.Error),
+            ErrorCodes.NotFound => NotFound(result.Error),
+            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+        };
+    }
+
     [HttpGet("listOption")]
     public async Task<ActionResult<List<OptionDto>>> GetListOption()
     {

@@ -43,7 +43,13 @@ public partial class Employee
 
     public DateTime UpdatedAt { get; set; }
 
+    public virtual ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+
+    public virtual ICollection<Consultation> Consultations { get; set; } = new List<Consultation>();
+
     public virtual User? CreatedByUser { get; set; }
+
+    public virtual ICollection<Exam> Exams { get; set; } = new List<Exam>();
 
     public virtual Position Position { get; set; } = null!;
 

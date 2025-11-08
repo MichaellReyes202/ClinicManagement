@@ -39,7 +39,7 @@ public class PatientServices : IPatientServices
         _mapper = mapper;
     }
 
-    public async Task<Result<PaginatedResponseDto<PatientSearchDto>>> EmployeesWithoutUsers(PaginationDto pagination)
+    public async Task<Result<PaginatedResponseDto<PatientSearchDto>>> SearchPatient(PaginationDto pagination)
     {
         var searchTerm = pagination.Query?.Trim().ToLower();
         Expression<Func<Patient, bool>> searchFilter = null;
@@ -68,7 +68,7 @@ public class PatientServices : IPatientServices
             .Take(pagination.Limit)
             .ToListAsync();
 
-        var paginatedResponse = new PaginatedResponseDto<EmployeeSearchDto>(total, items);
+        var paginatedResponse = new PaginatedResponseDto<PatientSearchDto>(total, items);
         return Result<PaginatedResponseDto<PatientSearchDto>>.Success(paginatedResponse);
     }
 

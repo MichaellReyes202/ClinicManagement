@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.IdentityModel.Tokens;
+using System;
 using System.Text;
 
 
@@ -90,6 +91,8 @@ builder.Services.AddScoped<IEmployesServices, EmployesServices>();
 builder.Services.AddScoped<ISpecialtiesServices, SpecialtiesServices>();
 builder.Services.AddScoped<ICatalogServices, CatalogServices>();
 builder.Services.AddScoped<IPatientServices, PatientServices>();
+builder.Services.AddScoped<IExamTypeServices ,  ExamTypeServices>();
+builder.Services.AddScoped<IAppointmentServices , AppointmentServices>();
 
 builder.Services.AddScoped<ISpecialtiesRepository, SpecialtiesRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
@@ -99,6 +102,9 @@ builder.Services.AddScoped<IPositionServices, PositionServices>();
 builder.Services.AddScoped<ICatBloodRepository, CatBloodRepository>();
 builder.Services.AddScoped<ISexRepository, SexRepository>();
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
+builder.Services.AddScoped<IExamTypeRepository , ExamTypeRepository>();
+builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
+builder.Services.AddScoped<ICatAppointmentStatusRepository, CatAppointmentStatusRepository>();
 
 
 builder.Services.AddHttpContextAccessor();

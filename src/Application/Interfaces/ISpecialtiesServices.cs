@@ -1,5 +1,7 @@
 ﻿using Application.DTOs;
+using Application.DTOs.ExamType;
 using Application.DTOs.specialty;
+using Application.DTOs.Specialty;
 using Domain.Entities;
 using Domain.Errors;
 using System;
@@ -16,6 +18,8 @@ namespace Application.Interfaces
         Task<Result<PaginatedResponseDto<SpecialtyListDto>>> GetAllSpecialties(PaginationDto pagination);
         Task<List<OptionDto>> GetAllSpecialtiesOptions();
         Task<Result<Specialty>> GetByIdAsync(int id);
+        Task<Result<List<DoctorBySpecialtyDto>>> GetDoctorBySpecialty(PaginationDto pagination);
+        Task<Result<PaginatedResponseDto<ExamsBySpecialtyListDto>>> GetExamsBySpecialty(PaginationDto pagination);
         Task<Result<Specialty>> UpdateSpecialtyAsync(int id, SpecialtiesUpdateDto specialtiesDto);
     }
 }

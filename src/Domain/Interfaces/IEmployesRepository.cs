@@ -5,14 +5,13 @@ using System.Threading.Tasks;
 
 
 
-namespace Domain.Interfaces
+namespace Domain.Interfaces;
+
+public interface IEmployesRepository : IGenericRepository<Employee>
 {
-    public interface IEmployesRepository : IGenericRepository<Employee>
-    {
-        Task<Employee?> GetEmployeeWithUserAsync(int id);
+    Task<Employee?> GetEmployeeWithUserAsync(int id);
 
-        // Actualizar Employee
-        Task UpdateEmployeeAsync(Employee employee);
+    // Actualizar Employee
+    Task UpdateEmployeeAsync(Employee employee);
 
-    }
 }

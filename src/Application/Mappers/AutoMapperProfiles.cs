@@ -1,4 +1,5 @@
 ﻿using Application.DTOs.Employee;
+using Application.DTOs.ExamType;
 using Application.DTOs.Patient;
 using Application.DTOs.Position;
 using Application.DTOs.Role;
@@ -231,6 +232,27 @@ namespace Application.Mappers
                             ContactPhone = src.PatientGuardian.ContactPhone
                           }
                           : null));
+
+
+            // -------------------------------------- Tipos de examenes   --------------------------------------
+
+            // fuente , destino 
+            CreateMap<ExamTypeCreateDto, ExamType>()
+                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name))
+                .ForMember(dest => dest.Description, opt => opt.MapFrom(src => src.Description))
+                .ForMember(dest => dest.DeliveryTime, opt => opt.MapFrom(src => src.DeliveryTime))
+                .ForMember(dest => dest.PricePaid, opt => opt.MapFrom(src => src.PricePaid))
+                .ForMember(dest => dest.SpecialtyId, opt => opt.MapFrom(src => src.SpecialtyId))
+                .ForMember(dest => dest.IsActive, opt => opt.MapFrom(src => true))
+
+                .ForMember(dest => dest.CreatedAt, opt => opt.Ignore()) // se manejara desde el servicio
+                .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore()) // se manejara desde el servicio
+                .ForMember(dest => dest.CreatedByUserId, opt => opt.Ignore()) // se manejara desde el servicio
+                .ForMember(dest => dest.UpdatedByUserId, opt => opt.Ignore()) // se manejara desde el servicio
+                .ReverseMap();
+
+            CreateMap<ExamTypeUpdateDto, ExamType>();
+            CreateMap<ExamType, ExamTypeResponseDto>();
 
         }
     }

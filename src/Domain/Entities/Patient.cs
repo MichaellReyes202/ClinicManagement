@@ -43,9 +43,16 @@ public partial class Patient
 
     public DateTime UpdatedAt { get; set; }
 
-    public virtual PatientGuardian? PatientGuardian { get; set; }
+    public virtual ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
+
     public virtual CatBloodType? BloodType { get; set; }
+
+    public virtual ICollection<Consultation> Consultations { get; set; } = new List<Consultation>();
+
     public virtual User? CreatedByUser { get; set; }
+
+    public virtual PatientGuardian? PatientGuardian { get; set; }
+
     public virtual CatSexo Sex { get; set; } = null!;
 
     public virtual User? UpdatedByUser { get; set; }

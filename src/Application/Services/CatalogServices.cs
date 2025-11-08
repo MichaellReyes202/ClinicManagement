@@ -10,11 +10,18 @@ public class CatalogServices : ICatalogServices
 {
     private readonly ISexRepository _sexRepository;
     private readonly ICatBloodRepository _catBloodRepository;
+    private readonly ICatAppointmentStatusRepository _catAppointmentStatusRepository;
 
-    public CatalogServices(ISexRepository sexRepository, ICatBloodRepository catBloodRepository)
+    public CatalogServices
+    (
+        ISexRepository sexRepository, 
+        ICatBloodRepository catBloodRepository ,
+        ICatAppointmentStatusRepository catAppointmentStatusRepository
+    )
     {
         _sexRepository = sexRepository;
         _catBloodRepository = catBloodRepository;
+        _catAppointmentStatusRepository = catAppointmentStatusRepository;
     }
     public async Task<List<OptionDto>> GetAllSexOptions()
     {
@@ -39,6 +46,23 @@ public class CatalogServices : ICatalogServices
         .OrderBy(s => s.Id)
         .ToListAsync();
 
+    }
+
+    public async Task<List<OptionDto>> GetAllAppointmentStatusOptions()
+    {
+        var query = await _catAppointmentStatusRepository.GetQuery();
+        return await query.Select(s => new OptionDto
+        {
+            Id = s.Id,
+            Name = s.Name,
+        })
+        .OrderBy(s => s.Id)
+        .ToListAsync();
+    }
+
+    public async Task<bool> ExistAppointmentStatus(int id )
+    {
+        return await _catAppointmentStatusRepository.ExistAsync(s => s.Id == id);
     }
     public async Task<bool> ExistSexId(int id)
     {
