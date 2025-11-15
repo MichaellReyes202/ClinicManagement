@@ -1,4 +1,5 @@
-﻿using Application.DTOs.Employee;
+﻿using Application.DTOs.Appointment;
+using Application.DTOs.Employee;
 using Application.DTOs.ExamType;
 using Application.DTOs.Patient;
 using Application.DTOs.Position;
@@ -254,6 +255,19 @@ namespace Application.Mappers
             CreateMap<ExamTypeUpdateDto, ExamType>();
             CreateMap<ExamType, ExamTypeResponseDto>();
 
+
+            // ---------------------------------- Appointment --------------------------------
+
+            CreateMap<AppointmentCreateDto, Appointment>()
+            .ForMember(dest => dest.Id, opt => opt.Ignore())
+            .ForMember(dest => dest.StatusId, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore())
+            .ForMember(dest => dest.CreatedByUserId, opt => opt.Ignore())
+            .ForMember(dest => dest.UpdatedByUserId, opt => opt.Ignore())
+            .ForMember(dest => dest.EndTime, opt => opt.Ignore());
+
+            CreateMap<Appointment, AppointmentResponseDto>();
         }
     }
 }

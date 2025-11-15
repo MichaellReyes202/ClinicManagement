@@ -78,7 +78,8 @@ public class SpecialtiesServices : ISpecialtiesServices
         var paginatedResponse = new PaginatedResponseDto<ExamsBySpecialtyListDto>(total, items);
         return Result<PaginatedResponseDto<ExamsBySpecialtyListDto>>.Success(paginatedResponse);
     }
-    public async Task< Result< List<DoctorBySpecialtyDto>>  > GetDoctorBySpecialty(PaginationDto pagination)
+    
+    public async Task< Result< List<DoctorBySpecialtyDto>>> GetDoctorBySpecialty(PaginationDto pagination)
     {
         var baseQuery = await _specialtiesRepository.GetQuery(include: q => q.Include(e => e.Employees));
 
@@ -89,11 +90,11 @@ public class SpecialtiesServices : ISpecialtiesServices
                 Id = e.Id,
                 Name = e.Name,
                 Doctors = e.Employees
-                    //.Where(emp => emp.PositionId == 1 && emp.IsActive == true) // <-- Filtro correcto
+                    .Where(em => em.PositionId == 1) // Position 1 (Cargo del doctor)
                     .Select(emp => new OptionDto
                     {
                         Id = emp.Id,
-                        Name = emp.FirstName + " " + (emp.MiddleName ?? "") + " " + emp.LastName + " " +  (emp.SecondLastName ?? "")
+                        Name = emp.FirstName + " " + (emp.MiddleName ?? "") + " " + emp.LastName + " " + (emp.SecondLastName ?? "")
                     })
                     .ToList()
             });

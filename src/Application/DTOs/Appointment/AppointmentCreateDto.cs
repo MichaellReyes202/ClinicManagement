@@ -1,7 +1,5 @@
 ﻿
 
-using System.ComponentModel.DataAnnotations;
-
 namespace Application.DTOs.Appointment;
 public class AppointmentCreateDto
 {

@@ -47,6 +47,8 @@ public class SpecialtiesController : ControllerBase
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
         };
     }
+    
+    
     [HttpGet("examsBySpecialty")]
     [Authorize]
     public async Task<ActionResult<Result<PaginatedResponseDto<SpecialtyListDto>>>> ExamsBySpecialty([FromQuery] PaginationDto pagination)
@@ -73,6 +75,8 @@ public class SpecialtiesController : ControllerBase
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
         };
     }
+    
+    
     [HttpGet("doctorsBySpecialty")]
     [Authorize]
     public async Task<ActionResult<List<DoctorBySpecialtyDto>>> DoctorsBySpecialty([FromQuery] PaginationDto pagination)

@@ -139,7 +139,6 @@ public class PatientsController : ControllerBase
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-
     public async Task<IActionResult> UpdateEmployee([FromBody] PatientUpdateDto dto, int Id)
     {
         var result = await _patientServices.UpdatePatientAsync(dto, Id);

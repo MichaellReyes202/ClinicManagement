@@ -6,38 +6,49 @@ namespace Application.Validators.Appointment
 {
     public class AppointmentCreateDtoValidator : AbstractValidator<AppointmentCreateDto>
     {
+        private static readonly DateTime Now = DateTime.Now;
+        private static readonly DateTime TwoHoursFromNow = Now.AddHours(2.5);
+
         public AppointmentCreateDtoValidator()
         {
             RuleFor(x => x.PatientId)
                 .GreaterThan(0)
                 .WithMessage("You must select a patient.");
-
             RuleFor(x => x.EmployeeId)
                 .GreaterThan(0)
                 .WithMessage("You must select a doctor.");
-
             RuleFor(x => x.Duration)
                 .InclusiveBetween(5, 150)
-                .WithMessage("The duration must be between 5 and 150 minutes.");
+                .WithMessage("The duration should be between 5 and 150 minutes.");
 
+            // StartTime: no vacío, no en el pasado, dentro de horario
             RuleFor(x => x.StartTime)
                 .NotEmpty()
-                .WithMessage("Start time is required.")
-                .Must(BeTomorrowOrLater)
-                .WithMessage("Appointments can only be scheduled starting from tomorrow.")
+                .WithMessage("The start date and time are required.")
+                .GreaterThanOrEqualTo(Now)
+                .WithMessage("Appointments cannot be scheduled in the past.")
                 .Must(BeWithinBusinessHours)
-                .WithMessage("The appointment start time must be within business hours (Mon-Fri 8:00 AM to 5:00 PM; Sat 8:00 AM to 12:00 PM).");
+                .WithMessage("The start time must be within the permitted hours (Mon-Fri 8:00-17:00, Sat 8:00-12:00).");
+
+            // Validación cruzada: cita termina >= 2.5 horas después de ahora + dentro del horario
+            RuleFor(x => x)
+                .Must(x =>
+                {
+                    var endTime = x.StartTime.AddMinutes(x.Duration);
+                    return endTime >= TwoHoursFromNow;
+                })
+                .WithMessage("The appointment must end at least 2 hours after the current time.")
+                .OverridePropertyName("StartTime"); 
 
             RuleFor(x => x)
-                .Must(x => IsEndTimeWithinBusinessHours(x.StartTime, x.Duration))
-                .WithMessage("The appointment end time must also be within business hours.");
+                .Must(x =>
+                {
+                    var endTime = x.StartTime.AddMinutes(x.Duration);
+                    return BeWithinBusinessHours(endTime);
+                })
+                .WithMessage("The end time must be within the allowed time.")
+                .OverridePropertyName("Duration");
         }
-        private static bool BeTomorrowOrLater(DateTime startTime)
-        {
-            var tomorrow = DateTime.Today.AddDays(1); // Mañana a las 00:00
-            return startTime.Date >= tomorrow.Date;
-        }
-
         private static bool BeWithinBusinessHours(DateTime dateTime)
         {
             var day = dateTime.DayOfWeek;
@@ -50,13 +61,7 @@ namespace Application.Validators.Appointment
                 return time >= TimeSpan.FromHours(8) && time < TimeSpan.FromHours(12);
 
             // Lunes a viernes
-            return time >= TimeSpan.FromHours(8) && time < TimeSpan.FromHours(17);
-        }
-        private static bool IsEndTimeWithinBusinessHours(DateTime startTime, int durationMinutes)
-        {
-            if (durationMinutes <= 0) return false;
-            var endTime = startTime.AddMinutes(durationMinutes);
-            return BeWithinBusinessHours(endTime);
+            return time >= TimeSpan.FromHours(8) && time < TimeSpan.FromHours(17.5);
         }
     }
 }
