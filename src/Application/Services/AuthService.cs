@@ -4,6 +4,7 @@ using Application.Interfaces;
 using Application.Util;
 using AutoMapper;
 using Domain.Entities;
+using Domain.Enums;
 using Domain.Errors;
 using Domain.Interfaces;
 using FluentValidation;
@@ -15,10 +16,6 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-
-//  Implementa IAuthService. Contendrá la lógica para verificar
-//  credenciales, generar tokens JWT y registrar usuarios,
-//  interactuando con los repositorios.
 
 namespace Application.Services
 {
@@ -34,21 +31,16 @@ namespace Application.Services
         private readonly IRoleRepository _roleRepository;
         private readonly IUserRepository _userRepository;
         private readonly IUserService _userService;
+        private readonly IAuditlogServices _auditlogServices;
 
-        public AuthService
-        (
-            UserManager<User> userManager,
-            SignInManager<User> signInManager,
-            IHttpContextAccessor contextAccessor,
-            IConfiguration configuration,
-            IValidator<LoginDto> validator_login,
+        public AuthService ( UserManager<User> userManager, SignInManager<User> signInManager, IHttpContextAccessor contextAccessor, IConfiguration configuration, IValidator<LoginDto> validator_login,
             IValidator<RegisterDto> validatorRegister,
             IMapper mapper,
             IEmployesRepository employesRepository,
             IRoleRepository roleRepository,
             IUserRepository userRepository,
-            IUserService userService
-
+            IUserService userService,
+            IAuditlogServices auditlogServices
 
         )
         {
@@ -62,6 +54,7 @@ namespace Application.Services
             _roleRepository = roleRepository;
             _userRepository = userRepository;
             _userService = userService;
+            _auditlogServices = auditlogServices;
         }
 
         public async Task<Result<AuthResponse>> LoginAsync(LoginDto loginDto)
@@ -93,12 +86,10 @@ namespace Application.Services
                     return Result<AuthResponse>.Failure(new Error(ErrorCodes.TooManyRequests, "User account is locked. Please try again later."));
                 }
             }
-
             if (await _userManager.IsLockedOutAsync(user))
                 return Result<AuthResponse>.Failure(new Error(ErrorCodes.TooManyRequests, "User account is locked. Please try again later."));
 
-            var result = await _signInManager
-                .CheckPasswordSignInAsync(user, loginDto.Password, lockoutOnFailure: true);
+            var result = await _signInManager .CheckPasswordSignInAsync(user, loginDto.Password, lockoutOnFailure: true);
 
             if (result.IsLockedOut)
             {
@@ -110,6 +101,24 @@ namespace Application.Services
             }
             if (!result.Succeeded)
             {
+                // Audit log para login fallido
+                try
+                {
+                    await _auditlogServices.RegisterActionAsync(
+                        userId: user?.Id,
+                        module: AuditModuletype.Auth,
+                        actionType: ActionType.LOGIN_FAILURE,
+                        recordDisplay: loginDto.Email,
+                        recordId: user?.Id ?? 0,
+                        status: AuditStatus.FAILURE,
+                        changeDetail: "Inicio de Sesion Fallida - Credenciales invalidas"
+                    );
+                }
+                catch (Exception auditEx)
+                {
+                    Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+                }
+                
                 return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "Invalid Credentials"));
             }
             else
@@ -117,6 +126,25 @@ namespace Application.Services
                 user.LastLogin = DateTime.UtcNow;
                 await _userRepository.UpdateAsync(user);
                 await _userRepository.SaveChangesAsync();
+
+                // Audit log para login exitoso
+                try
+                {
+                    await _auditlogServices.RegisterActionAsync(
+                        userId: user.Id,
+                        module: AuditModuletype.Auth,
+                        actionType: ActionType.LOGIN_SUCCESS,
+                        recordDisplay: user.Email,
+                        recordId: user.Id,
+                        status: AuditStatus.SUCCESS,
+                        changeDetail : "Inicio de sesion exitoso"
+                    );
+                }
+                catch (Exception auditEx)
+                {
+                    Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+                }
+                
                 return Result<AuthResponse>.Success(await GenerateJwtTokenAsync(user));
             }
         }
@@ -166,6 +194,24 @@ namespace Application.Services
                     await _employesRepository.UpdateEmployeeAsync(employe);
                     await _userManager.AddToRoleAsync(user, role.Name);
                     await _employesRepository.SaveChangesAsync();
+
+                    // Audit log para registro exitoso
+                    try
+                    {
+                        await _auditlogServices.RegisterActionAsync(
+                            userId: existingUser.Id,
+                            module: AuditModuletype.Auth,
+                            actionType: ActionType.CREATE,
+                            recordDisplay: $"{emailGenerator} - {employe.FirstName} {employe.LastName}",
+                            recordId: existingUser.Id,
+                            status: AuditStatus.SUCCESS,
+                            changeDetail: $"User created for employee ID {employe.Id} with role {role.Name}"
+                        );
+                    }
+                    catch (Exception auditEx)
+                    {
+                        Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+                    }
 
                     await transaction.CommitAsync();
                     return Result<UserDto>.Success(userDto);

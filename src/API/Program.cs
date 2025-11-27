@@ -1,4 +1,5 @@
 ﻿
+using API.Filters;
 using Application.Interfaces;
 using Application.Mappers;
 using Application.Services;
@@ -16,6 +17,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Text;
@@ -24,15 +26,22 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Area para agregar los filtros personalizados 
+builder.Services.AddScoped<AuthorizationAuditFilter>();
+
 // Agregar servicios al contenedor
-builder.Services.AddControllers()
-    .AddJsonOptions(options =>
-    {
-        // Ignora los ciclos de referencia
-        options.JsonSerializerOptions.ReferenceHandler =
-            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
-        options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
-    });
+builder.Services.AddControllers(options =>
+{
+    // Esto asegura que el filtro se ejecute en todas las peticiones
+    options.Filters.Add(typeof(AuthorizationAuditFilter));
+})
+.AddJsonOptions(options =>
+{
+    // Ignora los ciclos de referencia
+    options.JsonSerializerOptions.ReferenceHandler =
+        System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+});
 
 // Configurar DbContext con PostgreSQL
 builder.Services.AddDbContext<ClinicDbContext>(options =>
@@ -49,7 +58,6 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
            .SelectMany(kvp => kvp.Value!.Errors.Select(e =>
                new ValidationError(kvp.Key, e.ErrorMessage)))
            .ToList();
-        // Devolvemos el mismo formato que usas en tus servicios
         var result = Result.Failure(validationErrors);
 
         return new BadRequestObjectResult(new
@@ -93,6 +101,7 @@ builder.Services.AddScoped<ICatalogServices, CatalogServices>();
 builder.Services.AddScoped<IPatientServices, PatientServices>();
 builder.Services.AddScoped<IExamTypeServices ,  ExamTypeServices>();
 builder.Services.AddScoped<IAppointmentServices , AppointmentServices>();
+builder.Services.AddScoped<IAuditlogRepository, AuditlogRepository>();
 
 builder.Services.AddScoped<ISpecialtiesRepository, SpecialtiesRepository>();
 builder.Services.AddScoped<IRoleRepository, RoleRepository>();
@@ -105,6 +114,10 @@ builder.Services.AddScoped<IPatientRepository, PatientRepository>();
 builder.Services.AddScoped<IExamTypeRepository , ExamTypeRepository>();
 builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<ICatAppointmentStatusRepository, CatAppointmentStatusRepository>();
+builder.Services.AddScoped<IAuditlogServices, AuditlogServices>();
+
+
+
 
 
 builder.Services.AddHttpContextAccessor();
@@ -136,7 +149,7 @@ builder.Services.AddIdentity<User, Role>(options =>
     options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
 })
 //.AddErrorDescriber<>()
-.AddDefaultTokenProviders() // // Esto es necesario para que Identity pueda generar tokens de autenticaci�n, como los de restablecimiento de contrase�a o verificaci�n de correo electr�nico.
+.AddDefaultTokenProviders() // // Esto es necesario para que Identity pueda generar tokens de autenticacion, como los de restablecimiento de contrasea o verificaci�n de correo electr�nico.
 .AddUserStore<UserStore>()
 .AddRoleStore<RoleStore>()
 .AddSignInManager();
@@ -156,12 +169,12 @@ builder.Services
         opciones.MapInboundClaims = false;
         opciones.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = false,
-            ValidateAudience = false,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = key,
-            ClockSkew = TimeSpan.Zero,
+          ValidateIssuer = false,
+          ValidateAudience = false,
+          ValidateLifetime = true,
+          ValidateIssuerSigningKey = true,
+          IssuerSigningKey = key,
+          ClockSkew = TimeSpan.Zero,
         };
         opciones.Events = new JwtBearerEvents
         {

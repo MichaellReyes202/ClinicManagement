@@ -20,6 +20,7 @@ public class PatientServices : IPatientServices
     private readonly IUserService _userService;
     private readonly ICatalogServices _catalogServices;
     private readonly IMapper _mapper;
+    private readonly IAuditlogServices _auditlogServices;
 
     public PatientServices(
         IPatientRepository patientRepository , 
@@ -27,7 +28,8 @@ public class PatientServices : IPatientServices
         IValidator<PatientUpdateDto> updateValidator,
         IUserService userService , 
         ICatalogServices catalogServices ,
-        IMapper mapper
+        IMapper mapper,
+        IAuditlogServices auditlogServices
     )
     {
         _patientRepository = patientRepository;
@@ -37,6 +39,7 @@ public class PatientServices : IPatientServices
         _catalogServices = catalogServices;
 
         _mapper = mapper;
+        _auditlogServices = auditlogServices;
     }
 
     public async Task<Result<PaginatedResponseDto<PatientSearchDto>>> SearchPatient(PaginationDto pagination)
@@ -68,7 +71,7 @@ public class PatientServices : IPatientServices
             .Take(pagination.Limit)
             .ToListAsync();
 
-        var paginatedResponse = new PaginatedResponseDto<PatientSearchDto>(total, items);
+        var paginatedResponse = new PaginatedResponseDto<PatientSearchDto>(total, items, pagination.Limit);
         return Result<PaginatedResponseDto<PatientSearchDto>>.Success(paginatedResponse);
     }
 
@@ -123,7 +126,7 @@ public class PatientServices : IPatientServices
                 .Take(pagination.Limit)
                 .ToListAsync();
 
-            var paginatedResponse = new PaginatedResponseDto<PatientResponseDto>(total, items);
+            var paginatedResponse = new PaginatedResponseDto<PatientResponseDto>(total, items , pagination.Limit);
             return Result<PaginatedResponseDto<PatientResponseDto>>.Success(paginatedResponse);
         }
         catch (Exception ex)
@@ -219,6 +222,26 @@ public class PatientServices : IPatientServices
                 paciente.CreatedByUserId = userOnly?.Id;
                 await _patientRepository.AddAsync(paciente);
                 await _patientRepository.SaveChangesAsync();
+
+                // Registrar auditoría
+                try
+                {
+                    var fullName = $"{paciente.FirstName} {paciente.LastName}".Trim();
+                    await _auditlogServices.RegisterActionAsync(
+                        userId: userOnly?.Id,
+                        module: Domain.Enums.AuditModuletype.Patients,
+                        actionType: Domain.Enums.ActionType.CREATE,
+                        recordDisplay: fullName,
+                        recordId: paciente.Id,
+                        status: Domain.Enums.AuditStatus.SUCCESS
+                    );
+                }
+                catch (Exception auditEx)
+                {
+                    // Log pero no fallar la transacción
+                    Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+                }
+
                 await transacion.CommitAsync();
 
                 var patientDto = _mapper.Map<PatientResponseDto>(paciente);
@@ -317,6 +340,25 @@ public class PatientServices : IPatientServices
                 
                 await _patientRepository.UpdatePatientAsync(patient);
                 await _patientRepository.SaveChangesAsync();
+
+                // Registrar auditoría
+                try
+                {
+                    var fullName = $"{patient.FirstName} {patient.LastName}".Trim();
+                    await _auditlogServices.RegisterActionAsync(
+                        userId: userOnly?.Id,
+                        module: Domain.Enums.AuditModuletype.Patients,
+                        actionType: Domain.Enums.ActionType.UPDATE,
+                        recordDisplay: fullName,
+                        recordId: patient.Id,
+                        status: Domain.Enums.AuditStatus.SUCCESS
+                    );
+                }
+                catch (Exception auditEx)
+                {
+                    Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+                }
+
                 await transacion.CommitAsync();
 
                 return Result.Success();

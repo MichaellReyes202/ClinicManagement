@@ -85,7 +85,6 @@ public class ExamTypeController : ControllerBase
             ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
         };
-
     }
 
 
@@ -124,9 +123,42 @@ public class ExamTypeController : ControllerBase
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
 
-    public async Task<IActionResult> UpdateEmployee([FromBody] ExamTypeUpdateDto dto, int Id)
+    public async Task<IActionResult> Update([FromBody] ExamTypeUpdateDto dto, int Id)
     {
         var result = await _examTypeServices.Update(dto, Id);
+        if (result.IsSuccess)
+        {
+            return NoContent();
+        }
+        if (result.ValidationErrors.Count > 0)
+        {
+            return BadRequest(new
+            {
+                message = "One or more validation errors have occurred in the provided fields.",
+                errors = result.ValidationErrors
+            });
+        }
+        return result.Error?.Code switch
+        {
+            ErrorCodes.BadRequest => BadRequest(result.Error),
+            ErrorCodes.Conflict => Conflict(result.Error),
+            ErrorCodes.NotFound => NotFound(result.Error),
+            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+        };
+    }
+
+    // Activate or deactivate an exam type
+    [HttpPut("{Id:int}/activate")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> Activate(int Id)
+    {
+        var result = await _examTypeServices.UpdateState(Id);
         if (result.IsSuccess)
         {
             return NoContent();

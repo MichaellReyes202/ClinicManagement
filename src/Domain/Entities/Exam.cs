@@ -23,6 +23,8 @@ public partial class Exam
 
     public DateTime UpdatedAt { get; set; }
 
+    public virtual Appointment? Appointment { get; set; }
+
     public virtual Consultation? Consultation { get; set; }
 
     public virtual ExamType ExamType { get; set; } = null!;

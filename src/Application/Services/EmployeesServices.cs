@@ -21,6 +21,7 @@ public class EmployesServices : IEmployesServices
     private readonly ISpecialtiesRepository _specialtiesRepository;
     private readonly IPositionRepository _positionRepository;
     private readonly IUserService _userService;
+    private readonly IAuditlogServices _auditlogServices;
 
     public EmployesServices
     (
@@ -31,7 +32,8 @@ public class EmployesServices : IEmployesServices
         IValidator<EmployesUpdateDto> updateValidator,
         ISpecialtiesRepository specialtiesRepository,
         IPositionRepository positionRepository,
-        IUserService userService
+        IUserService userService,
+        IAuditlogServices auditlogServices
     )
     {
         _employeesRepository = employeesRepository;
@@ -42,6 +44,7 @@ public class EmployesServices : IEmployesServices
         _specialtiesRepository = specialtiesRepository;
         _positionRepository = positionRepository;
         _userService = userService;
+        _auditlogServices = auditlogServices;
     }
 
     public async Task<Result<PaginatedResponseDto<EmployeeSearchDto>>> EmployeesWithoutUsers(PaginationDto pagination)
@@ -69,7 +72,7 @@ public class EmployesServices : IEmployesServices
             .Take(pagination.Limit)
             .ToListAsync();
 
-        var paginatedResponse = new PaginatedResponseDto<EmployeeSearchDto>(total, items);
+        var paginatedResponse = new PaginatedResponseDto<EmployeeSearchDto>(total, items, pagination.Limit);
         return Result<PaginatedResponseDto<EmployeeSearchDto>>.Success(paginatedResponse);
     }
     public async Task<Result<PaginatedResponseDto<EmployeeListDTO>>> GetAllEmployes(PaginationDto pagination)
@@ -97,7 +100,7 @@ public class EmployesServices : IEmployesServices
                 .Take(pagination.Limit)
                 .ToListAsync();
 
-            var paginatedResponse = new PaginatedResponseDto<EmployeeListDTO>(total, items);
+            var paginatedResponse = new PaginatedResponseDto<EmployeeListDTO>(total, items, pagination.Limit);
             return Result<PaginatedResponseDto<EmployeeListDTO>>.Success(paginatedResponse);
         }
         catch (Exception ex)
@@ -177,6 +180,25 @@ public class EmployesServices : IEmployesServices
                 employee.UpdatedByUserId = userOnly?.Id;
                 await _employeesRepository.AddAsync(employee);
                 await _employeesRepository.SaveChangesAsync();
+
+                // Registrar auditoría
+                try
+                {
+                    var fullName = $"{employee.FirstName} {employee.LastName}".Trim();
+                    await _auditlogServices.RegisterActionAsync(
+                        userId: userOnly?.Id,
+                        module: Domain.Enums.AuditModuletype.Employees,
+                        actionType: Domain.Enums.ActionType.CREATE,
+                        recordDisplay: fullName,
+                        recordId: employee.Id,
+                        status: Domain.Enums.AuditStatus.SUCCESS
+                    );
+                }
+                catch (Exception auditEx)
+                {
+                    Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+                }
+
                 await transacion.CommitAsync();
 
                 var employeeDto = _mapper.Map<EmployeReponseDto>(employee);
@@ -266,6 +288,28 @@ public class EmployesServices : IEmployesServices
                 employe.UpdatedByUserId = userOnly!.Id;
                 await _employeesRepository.UpdateEmployeeAsync(employe);
                 await _employeesRepository.SaveChangesAsync();
+
+                // Registrar auditoría
+                try
+                {
+                    var fullName = $"{employe.FirstName} {employe.LastName}".Trim();
+                    var changeDetail = dto.IsActive == false ? "Empleado deshabilitado" : null;
+                    
+                    await _auditlogServices.RegisterActionAsync(
+                        userId: userOnly?.Id,
+                        module: Domain.Enums.AuditModuletype.Employees,
+                        actionType: Domain.Enums.ActionType.UPDATE,
+                        recordDisplay: fullName,
+                        recordId: employe.Id,
+                        status: Domain.Enums.AuditStatus.SUCCESS,
+                        changeDetail: changeDetail
+                    );
+                }
+                catch (Exception auditEx)
+                {
+                    Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+                }
+
                 await transacion.CommitAsync();
                 return Result.Success();
             }

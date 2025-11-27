@@ -15,4 +15,6 @@ public interface IExamTypeServices
     Task<Result<PaginatedResponseDto<ExamTypeListDto>>> GetAll(PaginationDto pagination);
     Task<Result<ExamTypeResponseDto>> GetById(int Id);
     Task<Result> Update(ExamTypeUpdateDto examTypeDto, int examTypeId);
+    // actualiza el estado de un examen --
+    Task<Result> UpdateState(int examTypeId);
 }

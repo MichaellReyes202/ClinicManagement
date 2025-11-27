@@ -35,6 +35,8 @@ public partial class User
 
     public virtual ICollection<Appointment> AppointmentUpdatedByUsers { get; set; } = new List<Appointment>();
 
+    public virtual ICollection<Auditlog> Auditlogs { get; set; } = new List<Auditlog>();
+
     public virtual ICollection<Consultation> ConsultationCreatedByUsers { get; set; } = new List<Consultation>();
 
     public virtual ICollection<Consultation> ConsultationUpdatedByUsers { get; set; } = new List<Consultation>();
@@ -58,6 +60,10 @@ public partial class User
     public virtual ICollection<Patient> PatientCreatedByUsers { get; set; } = new List<Patient>();
 
     public virtual ICollection<Patient> PatientUpdatedByUsers { get; set; } = new List<Patient>();
+
+    public virtual ICollection<Prescription> Prescriptions { get; set; } = new List<Prescription>();
+
+    public virtual ICollection<Promotion> Promotions { get; set; } = new List<Promotion>();
 
     public virtual User? UpdatedByUser { get; set; }
 

@@ -31,6 +31,8 @@ public partial class ExamType
 
     public virtual ICollection<Exam> Exams { get; set; } = new List<Exam>();
 
+    public virtual ICollection<PromotionExam> PromotionExams { get; set; } = new List<PromotionExam>();
+
     public virtual Specialty Specialty { get; set; } = null!;
 
     public virtual User? UpdatedByUser { get; set; }

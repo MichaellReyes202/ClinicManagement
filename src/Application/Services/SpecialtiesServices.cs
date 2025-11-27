@@ -20,6 +20,7 @@ public class SpecialtiesServices : ISpecialtiesServices
     private readonly IMapper _mapper;
     private readonly IValidator<SpecialtiesUpdateDto> _validatorUpdate;
     private readonly IValidator<SpecialtiesCreateDto> _validatorCreate;
+    private readonly IAuditlogServices _auditlogServices;
 
 
     public SpecialtiesServices
@@ -27,13 +28,15 @@ public class SpecialtiesServices : ISpecialtiesServices
         ISpecialtiesRepository specialtiesRepository, 
         IMapper mapper, 
         IValidator<SpecialtiesUpdateDto> validatorUpdate,
-        IValidator<SpecialtiesCreateDto> validatorCreate
+        IValidator<SpecialtiesCreateDto> validatorCreate,
+        IAuditlogServices auditlogServices
     )
     {
         _specialtiesRepository = specialtiesRepository;
         _mapper = mapper;
         _validatorUpdate = validatorUpdate;
         _validatorCreate = validatorCreate;
+        _auditlogServices = auditlogServices;
     }
 
     public async Task<List<OptionDto>> GetAllSpecialtiesOptions()
@@ -75,7 +78,7 @@ public class SpecialtiesServices : ISpecialtiesServices
                .Take(pagination.Limit)
                .ToListAsync();
 
-        var paginatedResponse = new PaginatedResponseDto<ExamsBySpecialtyListDto>(total, items);
+        var paginatedResponse = new PaginatedResponseDto<ExamsBySpecialtyListDto>(total, items, pagination.Limit);
         return Result<PaginatedResponseDto<ExamsBySpecialtyListDto>>.Success(paginatedResponse);
     }
     
@@ -126,7 +129,7 @@ public class SpecialtiesServices : ISpecialtiesServices
                     .Skip(pagination.Offset)
                     .Take(pagination.Limit)
                     .ToListAsync();
-            var paginatedResponse = new PaginatedResponseDto<SpecialtyListDto>(total, items);
+            var paginatedResponse = new PaginatedResponseDto<SpecialtyListDto>(total, items , pagination.Limit);
             return Result<PaginatedResponseDto<SpecialtyListDto>>.Success(paginatedResponse);
         }
         catch (Exception ex)
@@ -155,6 +158,8 @@ public class SpecialtiesServices : ISpecialtiesServices
                 new Error(ErrorCodes.Unexpected, $"An unexpected error occurred: {ex.Message}"));
         }
     }
+
+
     public async Task<Result<Specialty>> AddSpecialtyAsync(SpecialtiesCreateDto specialtiesDto)
     {
         var validationResult = await _validatorCreate.ValidateAsync(specialtiesDto);
@@ -176,6 +181,24 @@ public class SpecialtiesServices : ISpecialtiesServices
             var specialty = _mapper.Map<Specialty>(specialtiesDto);
             await _specialtiesRepository.AddAsync(specialty);
             await _specialtiesRepository.SaveChangesAsync();
+            
+            // Registrar auditoría
+            try
+            {
+                await _auditlogServices.RegisterActionAsync(
+                    userId: null,
+                    module: Domain.Enums.AuditModuletype.Specialties,
+                    actionType: Domain.Enums.ActionType.CREATE,
+                    recordDisplay: specialty.Name,
+                    recordId: specialty.Id,
+                    status: Domain.Enums.AuditStatus.SUCCESS
+                );
+            }
+            catch (Exception auditEx)
+            {
+                Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+            }
+            
             return Result<Specialty>.Success(specialty);
         }
         catch (Exception ex)
@@ -214,6 +237,24 @@ public class SpecialtiesServices : ISpecialtiesServices
         {
             await _specialtiesRepository.UpdateAsync(specialty);
             await _specialtiesRepository.SaveChangesAsync();
+            
+            // Registrar auditoría
+            try
+            {
+                await _auditlogServices.RegisterActionAsync(
+                    userId: null,
+                    module: Domain.Enums.AuditModuletype.Specialties,
+                    actionType: Domain.Enums.ActionType.UPDATE,
+                    recordDisplay: specialty.Name,
+                    recordId: specialty.Id,
+                    status: Domain.Enums.AuditStatus.SUCCESS
+                );
+            }
+            catch (Exception auditEx)
+            {
+                Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+            }
+            
             return Result<Specialty>.Success(specialty);
         }
         catch (Exception ex)

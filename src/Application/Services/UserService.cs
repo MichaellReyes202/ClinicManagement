@@ -52,7 +52,7 @@ namespace Application.Services
                        .Skip(pagination.Offset)
                        .Take(pagination.Limit)
                        .ToListAsync();
-                var paginatedResponse = new PaginatedResponseDto<UserListDto>(total, items);
+                var paginatedResponse = new PaginatedResponseDto<UserListDto>(total, items, pagination.Limit);
                 return Result<PaginatedResponseDto<UserListDto>>.Success(paginatedResponse);
 
             }catch( Exception ex )

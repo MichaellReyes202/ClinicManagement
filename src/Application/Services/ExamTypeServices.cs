@@ -1,4 +1,5 @@
 ﻿using Application.DTOs;
+using Application.DTOs.Employee;
 using Application.DTOs.ExamType;
 using Application.DTOs.Patient;
 using Application.Interfaces;
@@ -69,7 +70,7 @@ public class ExamTypeServices : IExamTypeServices
                 .Take(pagination.Limit)
                 .ToListAsync();
 
-            var paginatedResponse = new PaginatedResponseDto<ExamTypeListDto>(total, items);
+            var paginatedResponse = new PaginatedResponseDto<ExamTypeListDto>(total, items , pagination.Limit);
             return Result<PaginatedResponseDto<ExamTypeListDto>>.Success(paginatedResponse);
         }
         catch (Exception ex)
@@ -96,10 +97,7 @@ public class ExamTypeServices : IExamTypeServices
             return Result<ExamTypeResponseDto>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
         }
     }
-    //public async Task<Result<List<DoctorBySpecialtyDto>>> GetDoctorBySpecialty()
-    //{
-
-    //}
+  
     public async Task<Result<ExamTypeResponseDto>> Add(ExamTypeCreateDto examTypeDto)
     {
         var valitationResult = await _validator.ValidateAsync(examTypeDto);
@@ -156,6 +154,22 @@ public class ExamTypeServices : IExamTypeServices
         }
     }
 
+    public async Task<Result> UpdateState(int examTypeId)
+    {
+        if (examTypeId <= 0)
+        {
+            return Result.Failure(new Error(ErrorCodes.BadRequest, $"The ID : {examTypeId} sent is not valid.", nameof(examTypeId)));
+        }
+        var examType = await _examTypeRepository.GetByIdAsync(examTypeId);
+
+        if (examType == null)
+        {
+            return Result.Failure(new Error(ErrorCodes.NotFound, $"The exam type with id : {examTypeId} was not found", nameof(examTypeId)));
+        }
+        examType.IsActive = !examType.IsActive;
+        await _examTypeRepository.SaveChangesAsync();
+        return Result.Success();
+    }
 
 
     public async Task<Result> Update(ExamTypeUpdateDto examTypeDto , int examTypeId)

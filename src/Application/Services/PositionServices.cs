@@ -60,7 +60,7 @@ public class PositionServices : IPositionServices
                     .Skip(pagination.Offset)
                     .Take(pagination.Limit)
                     .ToListAsync();
-            var paginatedResponse = new PaginatedResponseDto<PositionListDto>(total, items);
+            var paginatedResponse = new PaginatedResponseDto<PositionListDto>(total, items, pagination.Limit);
             return Result<PaginatedResponseDto<PositionListDto>>.Success(paginatedResponse);
         }
         catch (Exception ex)
