@@ -23,7 +23,19 @@ namespace Infrastructure.Repositories
             _context = dbContext;
             dbSet = _context.Set<T>();
         }
-        public async Task<IQueryable<T>> GetQuery(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IQueryable<T>>? include = null)
+        public async Task UpdateAsync(T entity)
+        {
+            dbSet.Update(entity);
+            await Task.CompletedTask;
+        }
+
+        public async Task DeleteAsync(T entity)
+        {
+            dbSet.Remove(entity);
+            await Task.CompletedTask;
+        }
+
+        public async Task<IQueryable<T>> GetQuery(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>? include = null)
         {
             IQueryable<T> query = dbSet;
 
@@ -36,6 +48,12 @@ namespace Infrastructure.Repositories
             {
                 query = query.Where(filter);
             }
+
+            if (orderBy != null)
+            {
+                return orderBy(query);
+            }
+
             return query;
         }
 

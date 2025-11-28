@@ -115,6 +115,10 @@ builder.Services.AddScoped<IExamTypeRepository , ExamTypeRepository>();
 builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<ICatAppointmentStatusRepository, CatAppointmentStatusRepository>();
 builder.Services.AddScoped<IAuditlogServices, AuditlogServices>();
+builder.Services.AddScoped<IConsultationRepository, ConsultationRepository>();
+builder.Services.AddScoped<IConsultationServices, ConsultationServices>();
+builder.Services.AddScoped<IExamRepository, ExamRepository>();
+builder.Services.AddScoped<ILaboratoryServices, LaboratoryServices>();
 
 
 

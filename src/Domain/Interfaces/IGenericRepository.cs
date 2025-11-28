@@ -19,5 +19,7 @@ public interface IGenericRepository<T> where T : class
     Task<(List<T> items, int totalItems)> GetTotalAndPagination(int limit, int offset, Expression<Func<T, bool>>? filter = null);
     Task<(IQueryable<T> query, int totalItems)> GetQueryAndTotal(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IQueryable<T>>? include = null);
     Expression<Func<E, bool>> CombineFilters<E>(Expression<Func<E, bool>> f1, Expression<Func<E, bool>> f2);
-    Task<IQueryable<T>> GetQuery(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IQueryable<T>>? include = null);
+    Task UpdateAsync(T entity);
+    Task DeleteAsync(T entity);
+    Task<IQueryable<T>> GetQuery(Expression<Func<T, bool>>? filter = null, Func<IQueryable<T>, IOrderedQueryable<T>>? orderBy = null, Func<IQueryable<T>, IQueryable<T>>? include = null);
 }

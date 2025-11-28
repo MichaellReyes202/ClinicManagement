@@ -1,0 +1,15 @@
+using System;
+
+namespace Application.DTOs.Laboratory;
+
+public class ExamPendingDto
+{
+    public int Id { get; set; }
+    public int ExamTypeId { get; set; }
+    public string ExamTypeName { get; set; } = null!;
+    public int PatientId { get; set; }
+    public string PatientName { get; set; } = null!;
+    public int StatusId { get; set; }
+    public string StatusName { get; set; } = null!;
+    public DateTime CreatedAt { get; set; }
+}
