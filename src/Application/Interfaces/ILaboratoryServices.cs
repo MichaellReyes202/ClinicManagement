@@ -10,4 +10,5 @@ public interface ILaboratoryServices
     Task<Result<List<ExamPendingDto>>> GetPendingExamsAsync();
     Task<Result<List<ExamPendingDto>>> GetExamsByAppointmentIdAsync(int appointmentId);
     Task<Result<List<ExamPendingDto>>> GetExamsByPatientIdAsync(int patientId);
+    Task<Result<List<ExamPendingDto>>> GetAllExamsAsync();
 }

@@ -13,4 +13,6 @@ public class ExamPendingDto
     public string StatusName { get; set; } = null!;
     public string? Results { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int SpecialtyId { get; set; }
+    public string SpecialtyName { get; set; } = null!;
 }

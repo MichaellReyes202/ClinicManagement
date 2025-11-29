@@ -225,4 +225,20 @@ public class AppointmentController : ControllerBase
         };
 
     }
+    [HttpDelete("{id:int}")]
+    [Authorize]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var result = await _appointmentServices.Delete(id);
+        if (result.IsSuccess)
+        {
+            return NoContent();
+        }
+        return result.Error?.Code switch
+        {
+            ErrorCodes.NotFound => NotFound(result.Error),
+            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+            _ => BadRequest(result.Error)
+        };
+    }
 }

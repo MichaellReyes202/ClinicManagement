@@ -313,5 +313,44 @@ namespace Application.Services
                 }
             };
         }
+        public async Task<Result<UserDto>> ResetPasswordAsync(int userId)
+        {
+            var user = await _userRepository.GetByIdAsync(userId);
+            if (user == null)
+                return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, "User not found"));
+
+            var newPassword = PasswordGenerator.GenerateTemporaryPassword();
+            var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var result = await _userManager.ResetPasswordAsync(user, token, newPassword);
+
+            if (result.Succeeded)
+            {
+                // Audit log for password reset
+                try
+                {
+                    await _auditlogServices.RegisterActionAsync(
+                        userId: user.Id,
+                        module: AuditModuletype.Auth,
+                        actionType: ActionType.UPDATE,
+                        recordDisplay: user.Email,
+                        recordId: user.Id,
+                        status: AuditStatus.SUCCESS,
+                        changeDetail: "Password reset by admin"
+                    );
+                }
+                catch (Exception auditEx)
+                {
+                    Console.WriteLine($"Error registering audit: {auditEx.Message}");
+                }
+
+                return Result<UserDto>.Success(new UserDto
+                {
+                    Email = user.Email,
+                    Password = newPassword
+                });
+            }
+
+            return Result<UserDto>.Failure(new Error(ErrorCodes.Unexpected, "Failed to reset password"));
+        }
     }
 }

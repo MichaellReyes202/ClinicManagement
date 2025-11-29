@@ -127,6 +127,7 @@ builder.Services.AddScoped<IGenericRepository<Employee>, EmployesRepository>();
 builder.Services.AddScoped<IGenericRepository<Consultation>, ConsultationRepository>();
 builder.Services.AddScoped<IGenericRepository<Exam>, ExamRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IExamTypeServices, ExamTypeServices>();
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 

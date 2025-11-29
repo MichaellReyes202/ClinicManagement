@@ -1,5 +1,6 @@
 ﻿
 using Application.DTOs.Auth;
+using Application.DTOs.User;
 using Application.Interfaces;
 using Domain.Errors;
 using Microsoft.AspNetCore.Authorization;
@@ -104,6 +105,26 @@ namespace API.Controllers
             }
             return StatusCode(500 , result.Error);
 
+        }
+
+        [HttpPost("reset-password/{id}")]
+        [Authorize(Policy = "RequireAdmin")]
+        [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        public async Task<ActionResult<UserDto>> ResetPassword(int id)
+        {
+            var result = await _authService.ResetPasswordAsync(id);
+            if (result.IsSuccess)
+            {
+                return Ok(result.Value);
+            }
+            return result.Error?.Code switch
+            {
+                ErrorCodes.NotFound => NotFound(result.Error),
+                ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
+                _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
+            };
         }
 
     }

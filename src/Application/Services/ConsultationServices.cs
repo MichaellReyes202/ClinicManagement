@@ -200,6 +200,7 @@ public class ConsultationServices : IConsultationServices
             .Include(c => c.Patient)
             .Include(c => c.Employee)
             .Include(c => c.Exams).ThenInclude(e => e.ExamType)
+            .Include(c => c.Exams).ThenInclude(e => e.Status)
             .Include(c => c.Prescriptions).ThenInclude(p => p.PrescriptionItems).ThenInclude(pi => pi.Medication)
             .FirstOrDefaultAsync<Consultation>();
 
@@ -255,6 +256,7 @@ public class ConsultationServices : IConsultationServices
             .Include(c => c.Patient)
             .Include(c => c.Employee)
             .Include(c => c.Exams).ThenInclude(e => e.ExamType)
+            .Include(c => c.Exams).ThenInclude(e => e.Status)
             .Include(c => c.Prescriptions).ThenInclude(p => p.PrescriptionItems).ThenInclude(pi => pi.Medication)
             .OrderByDescending(c => c.CreatedAt)
             .ToListAsync();
@@ -305,6 +307,7 @@ public class ConsultationServices : IConsultationServices
             .Include(c => c.Patient)
             .Include(c => c.Employee)
             .Include(c => c.Exams).ThenInclude(e => e.ExamType)
+            .Include(c => c.Exams).ThenInclude(e => e.Status)
             .Include(c => c.Prescriptions).ThenInclude(p => p.PrescriptionItems).ThenInclude(pi => pi.Medication)
             .OrderByDescending(c => c.CreatedAt)
             .ToListAsync();

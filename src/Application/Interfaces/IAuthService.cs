@@ -14,4 +14,5 @@ public interface IAuthService
     // metodo para generar token JWT
     Task<AuthResponse> GenerateJwtTokenAsync(User user);
     Task<Result<AuthResponse>> GetUserOnly();
+    Task<Result<UserDto>> ResetPasswordAsync(int userId);
 }

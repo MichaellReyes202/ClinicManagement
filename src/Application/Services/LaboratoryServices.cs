@@ -120,7 +120,7 @@ public class LaboratoryServices : ILaboratoryServices
     {
         var query = await _examRepository.GetQuery(e => e.StatusId == 1 || e.StatusId == 3); // Programado or En Proceso
         var exams = await query
-            .Include(e => e.ExamType)
+            .Include(e => e.ExamType).ThenInclude(et => et.Specialty)
             .Include(e => e.Appointment).ThenInclude(a => a.Patient)
             .Include(e => e.Status)
             .OrderBy(e => e.CreatedAt)
@@ -136,7 +136,9 @@ public class LaboratoryServices : ILaboratoryServices
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
             Results = e.Results,
-            CreatedAt = e.CreatedAt
+            CreatedAt = e.CreatedAt,
+            SpecialtyId = e.ExamType.SpecialtyId,
+            SpecialtyName = e.ExamType.Specialty.Name
         }).ToList();
 
         return Result<List<ExamPendingDto>>.Success(dtos);
@@ -146,7 +148,7 @@ public class LaboratoryServices : ILaboratoryServices
     {
         var query = await _examRepository.GetQuery(e => e.AppointmentId == appointmentId);
         var exams = await query
-            .Include(e => e.ExamType)
+            .Include(e => e.ExamType).ThenInclude(et => et.Specialty)
             .Include(e => e.Appointment).ThenInclude(a => a.Patient)
             .Include(e => e.Status)
             .ToListAsync();
@@ -161,7 +163,9 @@ public class LaboratoryServices : ILaboratoryServices
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
             Results = e.Results,
-            CreatedAt = e.CreatedAt
+            CreatedAt = e.CreatedAt,
+            SpecialtyId = e.ExamType.SpecialtyId,
+            SpecialtyName = e.ExamType.Specialty.Name
         }).ToList();
 
         return Result<List<ExamPendingDto>>.Success(dtos);
@@ -170,7 +174,7 @@ public class LaboratoryServices : ILaboratoryServices
     {
         var query = await _examRepository.GetQuery(e => e.Appointment.PatientId == patientId);
         var exams = await query
-            .Include(e => e.ExamType)
+            .Include(e => e.ExamType).ThenInclude(et => et.Specialty)
             .Include(e => e.Appointment).ThenInclude(a => a.Patient)
             .Include(e => e.Status)
             .OrderByDescending(e => e.CreatedAt)
@@ -186,7 +190,37 @@ public class LaboratoryServices : ILaboratoryServices
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
             Results = e.Results,
-            CreatedAt = e.CreatedAt
+            CreatedAt = e.CreatedAt,
+            SpecialtyId = e.ExamType.SpecialtyId,
+            SpecialtyName = e.ExamType.Specialty.Name
+        }).ToList();
+
+        return Result<List<ExamPendingDto>>.Success(dtos);
+    }
+
+    public async Task<Result<List<ExamPendingDto>>> GetAllExamsAsync()
+    {
+        var query = await _examRepository.GetQuery();
+        var exams = await query
+            .Include(e => e.ExamType).ThenInclude(et => et.Specialty)
+            .Include(e => e.Appointment).ThenInclude(a => a.Patient)
+            .Include(e => e.Status)
+            .OrderByDescending(e => e.CreatedAt)
+            .ToListAsync();
+
+        var dtos = exams.Select(e => new ExamPendingDto
+        {
+            Id = e.Id,
+            ExamTypeId = e.ExamTypeId,
+            ExamTypeName = e.ExamType.Name,
+            PatientId = e.Appointment?.PatientId ?? 0,
+            PatientName = e.Appointment?.Patient != null ? $"{e.Appointment.Patient.FirstName} {e.Appointment.Patient.LastName}" : "Unknown",
+            StatusId = e.StatusId,
+            StatusName = e.Status.Name,
+            Results = e.Results,
+            CreatedAt = e.CreatedAt,
+            SpecialtyId = e.ExamType.SpecialtyId,
+            SpecialtyName = e.ExamType.Specialty.Name
         }).ToList();
 
         return Result<List<ExamPendingDto>>.Success(dtos);

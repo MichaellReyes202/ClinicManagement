@@ -71,4 +71,15 @@ public class LaboratoryController : ControllerBase
         }
         return BadRequest(result.Error);
     }
+
+    [HttpGet("all")]
+    public async Task<IActionResult> GetAllExams()
+    {
+        var result = await _laboratoryServices.GetAllExamsAsync();
+        if (result.IsSuccess)
+        {
+            return Ok(result.Value);
+        }
+        return BadRequest(result.Error);
+    }
 }

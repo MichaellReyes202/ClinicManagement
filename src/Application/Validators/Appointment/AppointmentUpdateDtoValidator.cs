@@ -57,7 +57,7 @@ public class AppointmentUpdateDtoValidator : AbstractValidator<AppointmentUpdate
             return false;
 
         if (day == DayOfWeek.Saturday)
-            return time >= TimeSpan.FromHours(8) && time < TimeSpan.FromHours(12);
+            return time >= TimeSpan.FromHours(8) && time <= TimeSpan.FromHours(17);
 
         // Lunes a viernes
         return time >= TimeSpan.FromHours(8) && time < TimeSpan.FromHours(17.5);
