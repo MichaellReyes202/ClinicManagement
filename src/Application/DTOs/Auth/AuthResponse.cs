@@ -16,6 +16,7 @@ namespace Application.DTOs.Auth
         public bool IsActive { get; set; }
         public List<string> Roles { get; set; } = new();
         public int RoleId { get; set; }
+        public int? EmployeeId { get; set; }
 
     }
 }

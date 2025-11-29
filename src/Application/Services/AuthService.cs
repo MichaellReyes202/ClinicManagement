@@ -186,6 +186,15 @@ namespace Application.Services
                     Password = initialPassword,
                 };
                 var user = _mapper.Map<User>(new UserDto() { Email = emailGenerator });
+                
+                var currentUser = await _userService.GetCurrentUserAsync();
+                if (currentUser != null)
+                {
+                    user.CreatedByUserId = currentUser.Id;
+                }
+                user.CreatedAt = DateTime.UtcNow;
+                user.UpdatedAt = DateTime.UtcNow;
+                user.IsActive = true;
                 var result = await _userManager.CreateAsync(user, initialPassword);
 
                 if (result.Succeeded)
@@ -299,7 +308,8 @@ namespace Application.Services
                     FullName = $"{user.EmployeeUser?.FirstName} {user.EmployeeUser?.LastName}",
                     IsActive = user.IsActive,
                     Roles = [.. roles],
-                    RoleId = (await _roleRepository.GetQuery(r => roles.Contains(r.Name))).FirstOrDefault()?.Id ?? 0 // Agregar RoleId al response si es necesario
+                    RoleId = (await _roleRepository.GetQuery(r => roles.Contains(r.Name))).FirstOrDefault()?.Id ?? 0, // Agregar RoleId al response si es necesario
+                    EmployeeId = user.EmployeeUser?.Id
                 }
             };
         }

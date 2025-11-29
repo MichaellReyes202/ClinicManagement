@@ -88,26 +88,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-
-// Area para registrar los servicios 
-builder.Services.AddScoped<IAuthService, AuthService>();
-builder.Services.AddScoped<IUserService, UserService>();
-
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IRoleService, RoleServices>();   
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IEmployesServices, EmployesServices>();
-builder.Services.AddScoped<ISpecialtiesServices, SpecialtiesServices>();
-builder.Services.AddScoped<ICatalogServices, CatalogServices>();
-builder.Services.AddScoped<IPatientServices, PatientServices>();
-builder.Services.AddScoped<IExamTypeServices ,  ExamTypeServices>();
-builder.Services.AddScoped<IAppointmentServices , AppointmentServices>();
-builder.Services.AddScoped<IAuditlogRepository, AuditlogRepository>();
-
-builder.Services.AddScoped<ISpecialtiesRepository, SpecialtiesRepository>();
-builder.Services.AddScoped<IRoleRepository, RoleRepository>();
-builder.Services.AddScoped<IEmployesRepository, EmployesRepository>();
-builder.Services.AddScoped<IPositionRepository, PositionRepository>();
 builder.Services.AddScoped<IPositionServices, PositionServices>();
 builder.Services.AddScoped<ICatBloodRepository, CatBloodRepository>();
 builder.Services.AddScoped<ISexRepository, SexRepository>();
@@ -125,6 +105,28 @@ builder.Services.AddScoped<IMedicationServices, MedicationServices>();
 builder.Services.AddScoped<IPdfService, PdfService>();
 builder.Services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
 builder.Services.AddScoped<IPrescriptionServices, PrescriptionServices>();
+builder.Services.AddScoped<IPatientServices, PatientServices>();
+builder.Services.AddScoped<IAppointmentServices, AppointmentServices>();
+builder.Services.AddScoped<ICatalogServices, CatalogServices>();
+
+// Missing Registrations
+builder.Services.AddScoped<IAuditlogRepository, AuditlogRepository>();
+builder.Services.AddScoped<IPositionRepository, PositionRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+builder.Services.AddScoped<ISpecialtiesRepository, SpecialtiesRepository>();
+builder.Services.AddScoped<IEmployesRepository, EmployesRepository>();
+
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IReportService, ReportService>();
+builder.Services.AddScoped<IEmployesServices, EmployesServices>();
+builder.Services.AddScoped<IRoleService, RoleServices>();
+builder.Services.AddScoped<ISpecialtiesServices, SpecialtiesServices>();
+builder.Services.AddScoped<IGenericRepository<Appointment>, AppointmentRepository>();
+builder.Services.AddScoped<IGenericRepository<Employee>, EmployesRepository>();
+builder.Services.AddScoped<IGenericRepository<Consultation>, ConsultationRepository>();
+builder.Services.AddScoped<IGenericRepository<Exam>, ExamRepository>();
+builder.Services.AddScoped<IAuthService, AuthService>();
 
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
@@ -248,40 +250,4 @@ app.UseCors("AllowFrontend"); // Mover aquí
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-app.Run();
-
-
-
-
-//app.UseExceptionHandler(exceptionHandlerApp => exceptionHandlerApp.Run(async context =>
-//{
-//    var exceptionHandlerFeature = context.Features.Get<IExceptionHandlerFeature>();
-//    var exception = exceptionHandlerFeature?.Error!;
-
-//    var error = new Error()
-//    {
-//        Message = exception.Message,
-//        StackTrace = exception.StackTrace,
-//        Fechas = DateTime.UtcNow
-//    };
-//    var dbContext = context.RequestServices.GetRequiredService<ApplicationDbContext>();
-//    dbContext.Add(error);
-//    await dbContext.SaveChangesAsync();
-//    await Results.InternalServerError(new
-//    {
-//        tipo = "error",
-//        mensaje = "Ha ocurrido un error inisperado",
-//        estatus = 500,
-//    }).ExecuteAsync(context);
-//}));
-
-//namespace BibliotecaAPI.Entidades
-//{
-//    public class Error
-//    {
-//        public Guid Id { get; set; }
-//        public required string Message { get; set; }
-//        public string? StackTrace { get; set; }
-//        public DateTime? Fechas { get; set; }
-//    }
-//}
+    app.Run();
