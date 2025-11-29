@@ -14,7 +14,7 @@ namespace Infrastructure.Repositories
 {
     public class GenericRepository<T> :  IGenericRepository<T> where T : class 
     {
-        private readonly ClinicDbContext _context;
+        protected readonly ClinicDbContext _context;
         private IDbContextTransaction _currentTransaction;
         internal DbSet<T> dbSet;
 

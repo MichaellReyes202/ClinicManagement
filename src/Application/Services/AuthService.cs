@@ -15,6 +15,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.EntityFrameworkCore; // Added for FirstOrDefault extension
 
 
 namespace Application.Services
@@ -261,7 +262,18 @@ namespace Application.Services
             };
             var roles = await _userManager.GetRolesAsync(user);
 
-            claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
+            foreach (var roleName in roles)
+            {
+                claims.Add(new Claim(ClaimTypes.Role, roleName));
+                
+                // Buscar el ID del rol para agregarlo como claim
+                var roleEntity = (await _roleRepository.GetQuery(r => r.Name == roleName)).FirstOrDefault();
+                if (roleEntity != null)
+                {
+                    claims.Add(new Claim("roleId", roleEntity.Id.ToString()));
+                }
+            }
+
             var jwtSettings = _configuration.GetSection("JwtSettings");
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
             var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -286,7 +298,8 @@ namespace Application.Services
                     Email = user.Email,
                     FullName = $"{user.EmployeeUser?.FirstName} {user.EmployeeUser?.LastName}",
                     IsActive = user.IsActive,
-                    Roles = [.. roles]
+                    Roles = [.. roles],
+                    RoleId = (await _roleRepository.GetQuery(r => roles.Contains(r.Name))).FirstOrDefault()?.Id ?? 0 // Agregar RoleId al response si es necesario
                 }
             };
         }

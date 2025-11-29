@@ -135,6 +135,7 @@ public class LaboratoryServices : ILaboratoryServices
             PatientName = e.Appointment?.Patient != null ? $"{e.Appointment.Patient.FirstName} {e.Appointment.Patient.LastName}" : "Unknown",
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
+            Results = e.Results,
             CreatedAt = e.CreatedAt
         }).ToList();
 
@@ -159,6 +160,7 @@ public class LaboratoryServices : ILaboratoryServices
             PatientName = e.Appointment?.Patient != null ? $"{e.Appointment.Patient.FirstName} {e.Appointment.Patient.LastName}" : "Unknown",
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
+            Results = e.Results,
             CreatedAt = e.CreatedAt
         }).ToList();
 
@@ -183,6 +185,7 @@ public class LaboratoryServices : ILaboratoryServices
             PatientName = e.Appointment?.Patient != null ? $"{e.Appointment.Patient.FirstName} {e.Appointment.Patient.LastName}" : "Unknown",
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
+            Results = e.Results,
             CreatedAt = e.CreatedAt
         }).ToList();
 

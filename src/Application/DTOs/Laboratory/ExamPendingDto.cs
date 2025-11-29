@@ -11,5 +11,6 @@ public class ExamPendingDto
     public string PatientName { get; set; } = null!;
     public int StatusId { get; set; }
     public string StatusName { get; set; } = null!;
+    public string? Results { get; set; }
     public DateTime CreatedAt { get; set; }
 }

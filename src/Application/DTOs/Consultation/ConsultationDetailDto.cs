@@ -17,4 +17,29 @@ public class ConsultationDetailDto
     public bool IsFinalized { get; set; }
     public DateTime? FinalizedAt { get; set; }
     public DateTime CreatedAt { get; set; }
+    public List<ConsultationExamDto> Exams { get; set; } = new();
+    public List<ConsultationPrescriptionDto> Prescriptions { get; set; } = new();
+}
+
+public class ConsultationExamDto
+{
+    public int Id { get; set; }
+    public string ExamTypeName { get; set; } = null!;
+    public string Status { get; set; } = null!;
+    public string? Results { get; set; }
+}
+
+public class ConsultationPrescriptionDto
+{
+    public int Id { get; set; }
+    public List<ConsultationPrescriptionItemDto> Items { get; set; } = new();
+    public string? Notes { get; set; }
+}
+
+public class ConsultationPrescriptionItemDto
+{
+    public string MedicationName { get; set; } = null!;
+    public string Dose { get; set; } = null!;
+    public string Frequency { get; set; } = null!;
+    public string Duration { get; set; } = null!;
 }

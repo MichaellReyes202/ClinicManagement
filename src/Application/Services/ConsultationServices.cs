@@ -199,6 +199,8 @@ public class ConsultationServices : IConsultationServices
         var consultation = await query
             .Include(c => c.Patient)
             .Include(c => c.Employee)
+            .Include(c => c.Exams).ThenInclude(e => e.ExamType)
+            .Include(c => c.Prescriptions).ThenInclude(p => p.PrescriptionItems).ThenInclude(pi => pi.Medication)
             .FirstOrDefaultAsync<Consultation>();
 
         if (consultation == null)
@@ -220,45 +222,129 @@ public class ConsultationServices : IConsultationServices
             TreatmentNotes = consultation.TreatmentNotes,
             IsFinalized = consultation.IsFinalized ?? false,
             FinalizedAt = consultation.FinalizedAt,
-            CreatedAt = consultation.CreatedAt
+            CreatedAt = consultation.CreatedAt,
+            Exams = consultation.Exams.Select(e => new ConsultationExamDto
+            {
+                Id = e.Id,
+                ExamTypeName = e.ExamType.Name,
+                Status = e.Status.Name,
+                Results = e.Results
+            }).ToList(),
+            Prescriptions = consultation.Prescriptions.Select(p => new ConsultationPrescriptionDto
+            {
+                Id = p.Id,
+                Notes = p.Notes,
+                Items = p.PrescriptionItems.Select(pi => new ConsultationPrescriptionItemDto
+                {
+                    MedicationName = pi.Medication.Name,
+                    Dose = pi.Dose,
+                    Frequency = pi.Frequency,
+                    Duration = pi.Duration
+                }).ToList()
+            }).ToList()
         };
 
         return Result<ConsultationDetailDto>.Success(dto);
     }
+        
+    
     public async Task<Result<List<ConsultationDetailDto>>> GetConsultationsByPatientIdAsync(int patientId)
     {
-        try
+        var query = await _consultationRepository.GetQuery(c => c.PatientId == patientId);
+        var consultations = await query
+            .Include(c => c.Patient)
+            .Include(c => c.Employee)
+            .Include(c => c.Exams).ThenInclude(e => e.ExamType)
+            .Include(c => c.Prescriptions).ThenInclude(p => p.PrescriptionItems).ThenInclude(pi => pi.Medication)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+
+        var dtos = consultations.Select(consultation => new ConsultationDetailDto
         {
-            var query = await _consultationRepository.GetQuery(
-                filter: c => c.PatientId == patientId,
-                orderBy: q => q.OrderByDescending(c => c.CreatedAt),
-                include: q => q.Include(c => c.Employee).Include(c => c.Patient)
-            );
-
-            var consultations = await query.ToListAsync();
-
-            var dtos = consultations.Select(c => new ConsultationDetailDto
+            Id = consultation.Id,
+            AppointmentId = consultation.AppointmentId ?? 0,
+            PatientId = consultation.PatientId,
+            PatientName = $"{consultation.Patient.FirstName} {consultation.Patient.LastName}",
+            DoctorId = consultation.EmployeeId,
+            DoctorName = $"{consultation.Employee.FirstName} {consultation.Employee.LastName}",
+            Reason = consultation.Reason,
+            PhysicalExam = consultation.PhysicalExam,
+            Diagnosis = consultation.Diagnosis,
+            TreatmentNotes = consultation.TreatmentNotes,
+            IsFinalized = consultation.IsFinalized ?? false,
+            FinalizedAt = consultation.FinalizedAt,
+            CreatedAt = consultation.CreatedAt,
+            Exams = consultation.Exams.Select(e => new ConsultationExamDto
             {
-                Id = c.Id,
-                AppointmentId = c.AppointmentId ?? 0,
-                PatientId = c.PatientId,
-                PatientName = $"{c.Patient.FirstName} {c.Patient.LastName}",
-                DoctorId = c.EmployeeId,
-                DoctorName = $"{c.Employee.FirstName} {c.Employee.LastName}",
-                Reason = c.Reason,
-                PhysicalExam = c.PhysicalExam,
-                Diagnosis = c.Diagnosis,
-                TreatmentNotes = c.TreatmentNotes,
-                IsFinalized = c.IsFinalized ?? false,
-                FinalizedAt = c.FinalizedAt,
-                CreatedAt = c.CreatedAt
-            }).ToList();
+                Id = e.Id,
+                ExamTypeName = e.ExamType.Name,
+                Status = e.Status.Name,
+                Results = e.Results
+            }).ToList(),
+            Prescriptions = consultation.Prescriptions.Select(p => new ConsultationPrescriptionDto
+            {
+                Id = p.Id,
+                Notes = p.Notes,
+                Items = p.PrescriptionItems.Select(pi => new ConsultationPrescriptionItemDto
+                {
+                    MedicationName = pi.Medication.Name,
+                    Dose = pi.Dose,
+                    Frequency = pi.Frequency,
+                    Duration = pi.Duration
+                }).ToList()
+            }).ToList()
+        }).ToList();
 
-            return Result<List<ConsultationDetailDto>>.Success(dtos);
-        }
-        catch (Exception ex)
+        return Result<List<ConsultationDetailDto>>.Success(dtos);
+    }
+
+    public async Task<Result<List<ConsultationDetailDto>>> GetAllConsultationsAsync()
+    {
+        var query = await _consultationRepository.GetQuery();
+        var consultations = await query
+            .Include(c => c.Patient)
+            .Include(c => c.Employee)
+            .Include(c => c.Exams).ThenInclude(e => e.ExamType)
+            .Include(c => c.Prescriptions).ThenInclude(p => p.PrescriptionItems).ThenInclude(pi => pi.Medication)
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync();
+
+        var dtos = consultations.Select(consultation => new ConsultationDetailDto
         {
-            return Result<List<ConsultationDetailDto>>.Failure(new Error("Consultation.GetHistory.Error", ex.Message));
-        }
+            Id = consultation.Id,
+            AppointmentId = consultation.AppointmentId ?? 0,
+            PatientId = consultation.PatientId,
+            PatientName = $"{consultation.Patient.FirstName} {consultation.Patient.LastName}",
+            DoctorId = consultation.EmployeeId,
+            DoctorName = $"{consultation.Employee.FirstName} {consultation.Employee.LastName}",
+            Reason = consultation.Reason,
+            PhysicalExam = consultation.PhysicalExam,
+            Diagnosis = consultation.Diagnosis,
+            TreatmentNotes = consultation.TreatmentNotes,
+            IsFinalized = consultation.IsFinalized ?? false,
+            FinalizedAt = consultation.FinalizedAt,
+            CreatedAt = consultation.CreatedAt,
+            Exams = consultation.Exams.Select(e => new ConsultationExamDto
+            {
+                Id = e.Id,
+                ExamTypeName = e.ExamType.Name,
+                Status = e.Status.Name,
+                Results = e.Results
+            }).ToList(),
+            Prescriptions = consultation.Prescriptions.Select(p => new ConsultationPrescriptionDto
+            {
+                Id = p.Id,
+                Notes = p.Notes,
+                Items = p.PrescriptionItems.Select(pi => new ConsultationPrescriptionItemDto
+                {
+                    MedicationName = pi.Medication.Name,
+                    Dose = pi.Dose,
+                    Frequency = pi.Frequency,
+                    Duration = pi.Duration
+                }).ToList()
+            }).ToList()
+        }).ToList();
+
+        return Result<List<ConsultationDetailDto>>.Success(dtos);
     }
 }

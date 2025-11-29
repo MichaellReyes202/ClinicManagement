@@ -11,6 +11,7 @@ using FluentValidation;
 using FluentValidation.AspNetCore;
 using Infrastructure.Persistence;
 using Infrastructure.Repositories;
+using Infrastructure.Services;
 using Infrastructure.Store;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -119,6 +120,13 @@ builder.Services.AddScoped<IConsultationRepository, ConsultationRepository>();
 builder.Services.AddScoped<IConsultationServices, ConsultationServices>();
 builder.Services.AddScoped<IExamRepository, ExamRepository>();
 builder.Services.AddScoped<ILaboratoryServices, LaboratoryServices>();
+builder.Services.AddScoped<IMedicationRepository, MedicationRepository>();
+builder.Services.AddScoped<IMedicationServices, MedicationServices>();
+builder.Services.AddScoped<IPdfService, PdfService>();
+builder.Services.AddScoped<IPrescriptionRepository, PrescriptionRepository>();
+builder.Services.AddScoped<IPrescriptionServices, PrescriptionServices>();
+
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 
 
@@ -209,11 +217,11 @@ builder.Services
 
 builder.Services.AddAuthorizationBuilder()
     // Agregar servicio de autorización
-    .AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"))
-    // Agregar servicio de autorización
-    .AddPolicy("UserOnly", policy => policy.RequireRole("User"))
-    // Agregar servicio de autorización
-    .AddPolicy("AdminOrUser", policy => policy.RequireRole("Admin", "User"));
+    .AddPolicy("RequireAdmin", policy => policy.RequireClaim("roleId", "1"))
+    .AddPolicy("RequireFrontDesk", policy => policy.RequireClaim("roleId", "1", "2"))
+    .AddPolicy("RequireClinical", policy => policy.RequireClaim("roleId", "3", "4", "5"))
+    .AddPolicy("RequireDoctorWrite", policy => policy.RequireClaim("roleId", "3"))
+    .AddPolicy("RequireLabStaff", policy => policy.RequireClaim("roleId", "1", "5"));
 
 builder.Services.AddOpenApi();
 

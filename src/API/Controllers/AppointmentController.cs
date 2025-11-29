@@ -105,9 +105,9 @@ public class AppointmentController : ControllerBase
 
     [HttpGet("today")]
     [Authorize]
-    public async Task<ActionResult<List<TodayAppointmentDto>>> GetTodayAppointments()
+    public async Task<ActionResult<List<TodayAppointmentDto>>> GetTodayAppointments([FromQuery] DateTime? date = null)
     {
-        var result = await _appointmentServices.GetTodayAppointmentsAsync();
+        var result = await _appointmentServices.GetTodayAppointmentsAsync(date);
 
         if (result.IsSuccess)
         {
@@ -166,7 +166,7 @@ public class AppointmentController : ControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<AppointmentResponseDto>> Add(AppointmentCreateDto dto)
+    public async Task<ActionResult<int>> Add(AppointmentCreateDto dto)
     {
         var result = await _appointmentServices.Add(dto);
         if (result.IsSuccess)

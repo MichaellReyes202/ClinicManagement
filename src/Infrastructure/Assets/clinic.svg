@@ -1,0 +1,46 @@
+<svg width="300" height="300" viewBox="0 0 300 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+        <linearGradient id="crossGradient" x1="50%" y1="0%" x2="50%" y2="100%">
+            <stop offset="0%" style="stop-color:#0056b3;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#007bff;stop-opacity:1" />
+        </linearGradient>
+        <linearGradient id="chartGradient" x1="0%" y1="50%" x2="100%" y2="50%">
+            <stop offset="0%" style="stop-color:#28a745;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#34ce57;stop-opacity:1" />
+        </linearGradient>
+         <linearGradient id="heartGradient" x1="50%" y1="0%" x2="50%" y2="100%">
+            <stop offset="0%" style="stop-color:#dc3545;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#f86c6b;stop-opacity:1" />
+        </linearGradient>
+    </defs>
+
+    <g transform="translate(150 150) scale(0.8)">
+        <path d="M-40 -100 L40 -100 L40 -40 L100 -40 L100 40 L40 40 L40 100 L-40 100 L-40 40 L-100 40 L-100 -40 L-40 -40 Z" fill="url(#crossGradient)" rx="10" ry="10" opacity="0.15"/>
+    </g>
+
+    <g transform="translate(50 50)">
+        <g transform="translate(20 20)">
+             <rect x="0" y="60" width="20" height="80" fill="url(#chartGradient)" rx="5" ry="5" />
+             <rect x="30" y="40" width="20" height="100" fill="url(#chartGradient)" rx="5" ry="5" />
+             <rect x="60" y="0" width="20" height="140" fill="url(#chartGradient)" rx="5" ry="5" />
+             <path d="M-10 150 L100 0" stroke="#34ce57" stroke-width="4" stroke-linecap="round" opacity="0.5"/>
+        </g>
+
+        <g transform="translate(110 20)">
+            <path d="M30 0 L30 30 L60 30 L60 60 L30 60 L30 90 L0 90 L0 60 L-30 60 L-30 30 L0 30 L0 0 Z" fill="url(#crossGradient)" rx="5" ry="5"/>
+        </g>
+
+        <g transform="translate(110 100) scale(0.8)">
+             <path d="M50 85 C50 85 10 45 10 25 C10 10 25 -5 50 15 C75 -5 90 10 90 25 C90 45 50 85 50 85 Z" fill="url(#heartGradient)"/>
+        </g>
+    </g>
+
+    <g transform="translate(150 240)">
+        <text x="0" y="0" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="32" font-weight="bold" fill="#0056b3" text-anchor="middle">
+            Clinica<tspan fill="#28a745">Management</tspan>
+        </text>
+         <text x="0" y="30" font-family="'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="14" fill="#6c757d" text-anchor="middle">
+            Salud y Gestión Eficiente
+        </text>
+    </g>
+</svg>

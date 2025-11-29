@@ -12,10 +12,12 @@ namespace API.Controllers;
 public class ConsultationController : ControllerBase
 {
     private readonly IConsultationServices _consultationServices;
+    private readonly IPdfService _pdfService;
 
-    public ConsultationController(IConsultationServices consultationServices)
+    public ConsultationController(IConsultationServices consultationServices, IPdfService pdfService)
     {
         _consultationServices = consultationServices;
+        _pdfService = pdfService;
     }
 
     [HttpPost("start")]
@@ -67,5 +69,31 @@ public class ConsultationController : ControllerBase
     {
         var result = await _consultationServices.GetConsultationsByPatientIdAsync(patientId);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+    }
+
+    [HttpGet("all")]
+    public async Task<IActionResult> GetAll()
+    {
+        var result = await _consultationServices.GetAllConsultationsAsync();
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+    }
+
+    [HttpGet("{id}/pdf")]
+    public async Task<IActionResult> GetConsultationPdf(int id)
+    {
+        // Note: The 'id' parameter here is treated as AppointmentId to match the frontend's available data (appt.id).
+        // If we strictly wanted ConsultationId, the frontend would need to fetch it first or we'd need a different route.
+        // Reusing GetConsultationByAppointmentIdAsync is the most efficient path given current context.
+        
+        var result = await _consultationServices.GetConsultationByAppointmentIdAsync(id);
+
+        if (!result.IsSuccess)
+        {
+            return NotFound(result.Error);
+        }
+
+        var pdfBytes = _pdfService.GenerateConsultationReport(result.Value);
+
+        return File(pdfBytes, "application/pdf", $"consulta_{id}.pdf");
     }
 }

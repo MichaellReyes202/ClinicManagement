@@ -11,6 +11,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System.Globalization;
+using System.Security.Claims;
 
 
 namespace Application.Services;
@@ -187,16 +188,43 @@ public class AppointmentServices : IAppointmentServices
         }
     }
 
-    public async Task<Result<List<TodayAppointmentDto>>> GetTodayAppointmentsAsync()
+    public async Task<Result<List<TodayAppointmentDto>>> GetTodayAppointmentsAsync(DateTime? date = null)
     {
         var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
         var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, userTimeZone);
-        var localTodayStart = localNow.Date; 
+        
+        // Si viene fecha, usamos esa convertida a local. Si no, usamos la fecha actual local.
+        var localDate = date.HasValue 
+            ? TimeZoneInfo.ConvertTimeFromUtc(date.Value, userTimeZone) 
+            : localNow;
+
+        var localTodayStart = localDate.Date;
+        
+        // Asegurar que el Kind sea Unspecified para que ConvertTimeToUtc funcione con la zona horaria del usuario
+        localTodayStart = DateTime.SpecifyKind(localTodayStart, DateTimeKind.Unspecified);
+
         var localTomorrowStart = localTodayStart.AddDays(1); 
         var utcStart = TimeZoneInfo.ConvertTimeToUtc(localTodayStart, userTimeZone);
         var utcEnd = TimeZoneInfo.ConvertTimeToUtc(localTomorrowStart, userTimeZone);
 
         var query = await _appointmentRepository.GetQuery(a => a.StartTime >= utcStart && a.StartTime < utcEnd && a.StatusId != 6);
+
+        // Data Scoping: Si es médico (Role 3), solo ver sus citas
+        var user = _httpContextAccessor.HttpContext?.User;
+        var roleIdClaim = user?.FindFirst("roleId");
+        if (roleIdClaim != null && int.TryParse(roleIdClaim.Value, out int roleId) && roleId == 3)
+        {
+             var currentUser = await _userService.GetCurrentUserAsync();
+             if (currentUser != null)
+             {
+                 var employeeQuery = await _employesRepository.GetQuery(e => e.UserId == currentUser.Id);
+                 var employee = await employeeQuery.FirstOrDefaultAsync();
+                 if (employee != null)
+                 {
+                     query = query.Where(a => a.EmployeeId == employee.Id);
+                 }
+             }
+        }
 
         var appointments = await query.Include(a => a.Patient).Include(a => a.Employee).ThenInclude(e => e!.Specialty).OrderBy(a => a.StartTime).ToListAsync();
         var esCulture = new CultureInfo("es-ES");
@@ -353,6 +381,24 @@ public class AppointmentServices : IAppointmentServices
     {
         var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
         var query = await _appointmentRepository.GetQuery();
+
+        // Data Scoping: Si es médico (Role 3), solo ver sus citas
+        var user = _httpContextAccessor.HttpContext?.User;
+        var roleIdClaim = user?.FindFirst("roleId");
+        if (roleIdClaim != null && int.TryParse(roleIdClaim.Value, out int roleId) && roleId == 3)
+        {
+             var currentUser = await _userService.GetCurrentUserAsync();
+             if (currentUser != null)
+             {
+                 var employeeQuery = await _employesRepository.GetQuery(e => e.UserId == currentUser.Id);
+                 var employee = await employeeQuery.FirstOrDefaultAsync();
+                 if (employee != null)
+                 {
+                     query = query.Where(a => a.EmployeeId == employee.Id);
+                 }
+             }
+        }
+
         if (filter.Specialty.HasValue)
         {
             query = query.Where(a => a.Employee.SpecialtyId == filter.Specialty.Value);
@@ -432,7 +478,7 @@ public class AppointmentServices : IAppointmentServices
         return Result<List<AppointmentListDto>>.Success(result);
     }
 
-    public async Task<Result<AppointmentResponseDto>> Add(AppointmentCreateDto dto)
+    public async Task<Result<int>> Add(AppointmentCreateDto dto)
     {
         var validationResult = await _createValidator.ValidateAsync(dto);
         if (!validationResult.IsValid)
@@ -440,7 +486,7 @@ public class AppointmentServices : IAppointmentServices
             var errors = validationResult.Errors
                 .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
                 .ToList();
-            return Result<AppointmentResponseDto>.Failure(errors);
+            return Result<int>.Failure(errors);
         }
 
         using var transaction = await _appointmentRepository.BeginTransactionAsync();
@@ -450,12 +496,12 @@ public class AppointmentServices : IAppointmentServices
             var patientExists = await _patientRepository.ExistAsync(p => p.Id == dto.PatientId);
             if (!patientExists)
             {
-                return Result<AppointmentResponseDto>.Failure(new Error(ErrorCodes.NotFound, "The patient does not exist or is inactive", "PatientId"));
+                return Result<int>.Failure(new Error(ErrorCodes.NotFound, "The patient does not exist or is inactive", "PatientId"));
             }
             var doctorExists = await _employesRepository.ExistAsync(e => e.Id == dto.EmployeeId && e.IsActive.HasValue && e.PositionId == 1);
             if (!doctorExists)
             {
-                return Result<AppointmentResponseDto>.Failure(new Error(ErrorCodes.NotFound, "The doctor does not exist or is inactive.", "EmployeeId"));
+                return Result<int>.Failure(new Error(ErrorCodes.NotFound, "The doctor does not exist or is inactive.", "EmployeeId"));
             }
             var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
             var incomingLocalTime = DateTime.SpecifyKind(dto.StartTime, DateTimeKind.Unspecified);
@@ -477,7 +523,7 @@ public class AppointmentServices : IAppointmentServices
 
             if (patientHasAppointmentToday)
             {
-                return Result<AppointmentResponseDto>.Failure(new Error(ErrorCodes.BadRequest, "The patient already has an appointment scheduled for this day.", "StartTime"));
+                return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "The patient already has an appointment scheduled for this day.", "StartTime"));
             }
             var doctorHasOverlap = await _appointmentRepository.ExistAsync(a =>
                 a.EmployeeId == dto.EmployeeId &&
@@ -488,7 +534,7 @@ public class AppointmentServices : IAppointmentServices
 
             if (doctorHasOverlap)
             {
-                return Result<AppointmentResponseDto>.Failure(new Error(ErrorCodes.BadRequest, "The doctor already has an appointment at that time.", "StartTime"));
+                return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "The doctor already has an appointment at that time.", "StartTime"));
             }
 
             var appointment = _mapper.Map<Appointment>(dto);
@@ -526,18 +572,17 @@ public class AppointmentServices : IAppointmentServices
 
             await transaction.CommitAsync();
 
-            var response = _mapper.Map<AppointmentResponseDto>(appointment);
-            return Result<AppointmentResponseDto>.Success(response);
+            return Result<int>.Success(appointment.Id);
         }
         catch (DbUpdateException)
         {
             await transaction.RollbackAsync();
-            return Result<AppointmentResponseDto>.Failure(new Error(ErrorCodes.Unexpected, "Error saving to database."));
+            return Result<int>.Failure(new Error(ErrorCodes.Unexpected, "Error saving to database."));
         }
         catch (Exception)
         {
             await transaction.RollbackAsync();
-            return Result<AppointmentResponseDto>.Failure(new Error(ErrorCodes.Unexpected, "Unexpected error creating appointment."));
+            return Result<int>.Failure(new Error(ErrorCodes.Unexpected, "Unexpected error creating appointment."));
         }
     }
     public async Task<Result> Update(AppointmentUpdateDto dto, int patientId)

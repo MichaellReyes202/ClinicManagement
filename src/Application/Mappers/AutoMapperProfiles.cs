@@ -6,6 +6,8 @@ using Application.DTOs.Position;
 using Application.DTOs.Role;
 using Application.DTOs.specialty;
 using Application.DTOs.User;
+using Application.DTOs.Medication;
+using Application.DTOs.Prescription;
 using AutoMapper;
 using Domain.Entities;
 
@@ -268,6 +270,18 @@ namespace Application.Mappers
             .ForMember(dest => dest.EndTime, opt => opt.Ignore());
 
             CreateMap<Appointment, AppointmentResponseDto>();
+
+            // ---------------------------------- Medication --------------------------------
+            CreateMap<Medication, MedicationDto>();
+
+            // ---------------------------------- Prescription --------------------------------
+            CreateMap<Prescription, PrescriptionDto>()
+                .ForMember(dest => dest.Items, opt => opt.MapFrom(src => src.PrescriptionItems))
+                .ForMember(dest => dest.DoctorName, opt => opt.MapFrom(src => src.Consultation != null && src.Consultation.Employee != null ? $"{src.Consultation.Employee.FirstName} {src.Consultation.Employee.LastName}" : null));
+
+            CreateMap<PrescriptionItem, PrescriptionItemDto>()
+                .ForMember(dest => dest.MedicationName, opt => opt.MapFrom(src => src.Medication != null ? src.Medication.Name : string.Empty))
+                .ForMember(dest => dest.Concentration, opt => opt.MapFrom(src => src.Medication != null ? src.Medication.Concentration : null));
         }
     }
 }
