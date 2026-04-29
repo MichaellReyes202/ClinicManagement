@@ -1,9 +1,11 @@
 
 using Application.DTOs;
 using Application.DTOs.AuditLog;
+using Application.DTOs.Auth;
 using Application.DTOs.specialty;
 using Application.Interfaces;
 using Application.Util;
+using DocumentFormat.OpenXml.Spreadsheet;
 using Domain.Entities;
 using Domain.Enums;
 using Domain.Errors;
@@ -113,6 +115,19 @@ public class AuditlogServices : IAuditlogServices
         };
         await _auditlogRepository.AddAsync(audit);
         await _auditlogRepository.SaveChangesAsync(); 
+    }
+
+    public async Task RegisterLoginActionAsync(bool succes , int? userId, string recordDisplay)
+    {
+        await RegisterActionAsync(
+            userId: userId,
+            module: AuditModuletype.Auth,
+            actionType: succes ? ActionType.LOGIN_FAILURE : ActionType.LOGIN_FAILURE,
+            recordDisplay: recordDisplay,
+            recordId: userId ?? 0,
+            status: succes ?  AuditStatus.SUCCESS : AuditStatus.FAILURE,
+            changeDetail: succes ? "Login successful "  : "Failed Login - Invalid Credentials"
+        );
     }
     
     public async Task RegisterActionAsync(int? userId, AuditModuletype module, ActionType actionType, string recordDisplay, int recordId, AuditStatus status, string? changeDetail = null)

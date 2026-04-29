@@ -13,171 +13,75 @@ namespace API.Controllers;
 
 [ApiController]
 [Route("api/examType")]
-public class ExamTypeController : ControllerBase
+public class ExamTypeController : BaseController
 {
-    private readonly IExamTypeServices _examTypeServices;
+  private readonly IExamTypeServices _examTypeServices;
 
-    public ExamTypeController(IExamTypeServices examTypeServices)
+  public ExamTypeController(IExamTypeServices examTypeServices)
+  {
+    _examTypeServices = examTypeServices;
+  }
+  [HttpGet]
+  [Authorize]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+  public async Task<IActionResult> Get([FromQuery] PaginationDto pagination)
+  {
+    var result = await _examTypeServices.GetAll(pagination);
+    return result.IsSuccess ? Ok(new
     {
-        _examTypeServices = examTypeServices;
-    }
-    [HttpGet]
-    [Authorize]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Get([FromQuery] PaginationDto pagination)
-    {
-        var result = await _examTypeServices.GetAll(pagination);
-        if (result.IsSuccess)
-        {
-            return Ok(new
-            {
-                count = result.Value?.Count,
-                pages = result.Value?.Pages,
-                items = result.Value?.Items
-            });
-        }
-        if (result.ValidationErrors.Count > 0)
-        {
-            return BadRequest(new
-            {
-                message = "One or more validation errors have occurred in the provided fields.",
-                errors = result.ValidationErrors
-            });
-        }
-        return result.Error?.Code switch
-        {
-            ErrorCodes.BadRequest => BadRequest(result.Error),
-            ErrorCodes.Conflict => Conflict(result.Error),
-            ErrorCodes.NotFound => NotFound(result.Error),
-            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
-        };
-    }
-   
-    [Authorize]
-    [HttpPost("createExamType")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> CreateEmployee(ExamTypeCreateDto patient)
-    {
-        var result = await _examTypeServices.Add(patient);
+      count = result.Value?.Count,
+      pages = result.Value?.Pages,
+      items = result.Value?.Items
+    }) : HandleFailure(result);
+  }
 
-        if (result.IsSuccess)
-        {
-            return CreatedAtAction(nameof(GetExamType), new { id = result.Value!.Id }, result.Value);
-        }
-        if (result.ValidationErrors.Count > 0)
-        {
-            return BadRequest(new
-            {
-                message = "One or more validation errors have occurred in the provided fields.",
-                errors = result.ValidationErrors
-            });
-        }
-        return result.Error?.Code switch
-        {
-            ErrorCodes.BadRequest => BadRequest(result.Error),
-            ErrorCodes.Conflict => Conflict(result.Error),
-            ErrorCodes.NotFound => NotFound(result.Error),
-            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
-        };
-    }
+  [Authorize]
+  [HttpPost("createExamType")]
+  [ProducesResponseType(StatusCodes.Status200OK)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status409Conflict)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  public async Task<IActionResult> CreateEmployee(ExamTypeCreateDto patient)
+  {
+    var result = await _examTypeServices.Add(patient);
+    return result.IsSuccess ? CreatedAtAction(nameof(GetExamType), new { id = result.Value!.Id }, result.Value) : HandleFailure(result);
+  }
 
 
-    [HttpGet("{id:int}", Name = "GetExamType")]
-    [Authorize]
-    public async Task<ActionResult<EmployeReponseDto>> GetExamType(int Id)
-    {
-        var result = await _examTypeServices.GetById(Id);
-        if (result.IsSuccess)
-        {
-            return Ok(result.Value);
-        }
-        if (result.ValidationErrors.Count > 0)
-        {
-            return BadRequest(new
-            {
-                message = "One or more validation errors have occurred in the provided fields.",
-                errors = result.ValidationErrors
-            });
-        }
-        return result.Error?.Code switch
-        {
-            ErrorCodes.BadRequest => BadRequest(result.Error),
-            ErrorCodes.Conflict => Conflict(result.Error),
-            ErrorCodes.NotFound => NotFound(result.Error),
-            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
-        };
-    }
+  [HttpGet("{id:int}", Name = "GetExamType")]
+  [Authorize]
+  public async Task<ActionResult<EmployeReponseDto>> GetExamType(int Id)
+  {
+    var result = await _examTypeServices.GetById(Id);
+    return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
+  }
 
-    [HttpPut("{Id:int}")]
-    [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+  [HttpPut("{Id:int}")]
+  [Authorize]
+  [ProducesResponseType(StatusCodes.Status204NoContent)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status409Conflict)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  [ProducesResponseType(StatusCodes.Status500InternalServerError)]
 
-    public async Task<IActionResult> Update([FromBody] ExamTypeUpdateDto dto, int Id)
-    {
-        var result = await _examTypeServices.Update(dto, Id);
-        if (result.IsSuccess)
-        {
-            return NoContent();
-        }
-        if (result.ValidationErrors.Count > 0)
-        {
-            return BadRequest(new
-            {
-                message = "One or more validation errors have occurred in the provided fields.",
-                errors = result.ValidationErrors
-            });
-        }
-        return result.Error?.Code switch
-        {
-            ErrorCodes.BadRequest => BadRequest(result.Error),
-            ErrorCodes.Conflict => Conflict(result.Error),
-            ErrorCodes.NotFound => NotFound(result.Error),
-            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
-        };
-    }
+  public async Task<IActionResult> Update([FromBody] ExamTypeUpdateDto dto, int Id)
+  {
+    var result = await _examTypeServices.Update(dto, Id);
+    return result.IsSuccess ? NoContent() : HandleFailure(result);
+  }
 
-    // Activate or deactivate an exam type
-    [HttpPut("{Id:int}/activate")]
-    [Authorize]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status409Conflict)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<IActionResult> Activate(int Id)
-    {
-        var result = await _examTypeServices.UpdateState(Id);
-        if (result.IsSuccess)
-        {
-            return NoContent();
-        }
-        if (result.ValidationErrors.Count > 0)
-        {
-            return BadRequest(new
-            {
-                message = "One or more validation errors have occurred in the provided fields.",
-                errors = result.ValidationErrors
-            });
-        }
-        return result.Error?.Code switch
-        {
-            ErrorCodes.BadRequest => BadRequest(result.Error),
-            ErrorCodes.Conflict => Conflict(result.Error),
-            ErrorCodes.NotFound => NotFound(result.Error),
-            ErrorCodes.Unexpected => StatusCode(StatusCodes.Status500InternalServerError, result.Error),
-            _ => StatusCode(StatusCodes.Status500InternalServerError, new { message = "An unhandled error occurred." })
-        };
-    }
+  // Activate or deactivate an exam type
+  [HttpPut("{Id:int}/activate")]
+  [Authorize]
+  [ProducesResponseType(StatusCodes.Status204NoContent)]
+  [ProducesResponseType(StatusCodes.Status400BadRequest)]
+  [ProducesResponseType(StatusCodes.Status409Conflict)]
+  [ProducesResponseType(StatusCodes.Status404NotFound)]
+  [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+  public async Task<IActionResult> Activate(int Id)
+  {
+    var result = await _examTypeServices.UpdateState(Id);
+    return result.IsSuccess ? NoContent() : HandleFailure(result);
+  }
 }

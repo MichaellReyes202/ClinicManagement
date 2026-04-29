@@ -17,10 +17,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using System;
 using System.Text;
 
 
@@ -33,44 +30,67 @@ builder.Services.AddScoped<AuthorizationAuditFilter>();
 // Agregar servicios al contenedor
 builder.Services.AddControllers(options =>
 {
-    // Esto asegura que el filtro se ejecute en todas las peticiones
-    options.Filters.Add(typeof(AuthorizationAuditFilter));
+  // Esto asegura que el filtro se ejecute en todas las peticiones
+  options.Filters.Add(typeof(AuthorizationAuditFilter));
 })
 .AddJsonOptions(options =>
 {
-    // Ignora los ciclos de referencia
-    options.JsonSerializerOptions.ReferenceHandler =
-        System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
-    options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+  // Ignora los ciclos de referencia
+  options.JsonSerializerOptions.ReferenceHandler =
+      System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+  options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
 });
 
 // Configurar DbContext con PostgreSQL
 builder.Services.AddDbContext<ClinicDbContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+  options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
 });
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
-    options.InvalidModelStateResponseFactory = context =>
-    {
-        var validationErrors = context.ModelState
-           .Where(ms => ms.Value?.Errors.Count > 0)
-           .SelectMany(kvp => kvp.Value!.Errors.Select(e =>
-               new ValidationError(kvp.Key, e.ErrorMessage)))
-           .ToList();
-        var result = Result.Failure(validationErrors);
+  options.InvalidModelStateResponseFactory = context =>
+  {
+    // 1. Extraemos los errores automáticos de .NET
+    var errors = context.ModelState
+          .Where(e => e.Value.Errors.Count > 0)
+          .SelectMany(kvp => kvp.Value.Errors.Select(e => new ValidationError(
+              propertyName: kvp.Key,
+              errorMessage: e.ErrorMessage
+          )))
+          .ToList();
 
-        return new BadRequestObjectResult(new
-        {
-            message = "Validation failed - check required fields",
-            errors = result.ValidationErrors.Select(v => new
-            {
-                propertyName = v.PropertyName,
-                errorMessage = v.ErrorMessage
-            })
-        });
-    };
+    // 2. Armamos nuestro objeto estándar
+    var standardError = new Error(
+          code: "BadRequest",
+          description: "",
+          field: null,
+          metadata: null,
+          validationErrors: errors
+      );
+
+    // 3. Retornamos 400 Bad Request con nuestra estructura exacta
+    return new BadRequestObjectResult(standardError);
+
+
+
+    //var validationErrors = context.ModelState
+    //   .Where(ms => ms.Value?.Errors.Count > 0)
+    //   .SelectMany(kvp => kvp.Value!.Errors.Select(e =>
+    //       new ValidationError(kvp.Key, e.ErrorMessage)))
+    //   .ToList();
+    //var result = Result.Failure(validationErrors);
+
+    //return new BadRequestObjectResult(new
+    //{
+    //    message = "Validation failed - check required fields",
+    //    errors = result.ValidationErrors.Select(v => new
+    //    {
+    //        propertyName = v.PropertyName,
+    //        errorMessage = v.ErrorMessage
+    //    })
+    //});
+  };
 });
 
 // ======================================================
@@ -79,20 +99,20 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5174", "http://localhost:5173") 
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials(); // si usas cookies o tokens Bearer
-    });
+  options.AddPolicy("AllowFrontend", policy =>
+  {
+    policy.WithOrigins("http://localhost:5174", "http://localhost:5173")
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials(); // si usas cookies o tokens Bearer
+  });
 });
 
 builder.Services.AddScoped<IPositionServices, PositionServices>();
 builder.Services.AddScoped<ICatBloodRepository, CatBloodRepository>();
 builder.Services.AddScoped<ISexRepository, SexRepository>();
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
-builder.Services.AddScoped<IExamTypeRepository , ExamTypeRepository>();
+builder.Services.AddScoped<IExamTypeRepository, ExamTypeRepository>();
 builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<ICatAppointmentStatusRepository, CatAppointmentStatusRepository>();
 builder.Services.AddScoped<IAuditlogServices, AuditlogServices>();
@@ -152,16 +172,16 @@ builder.Services.AddValidatorsFromAssemblyContaining<LoginDtoValidator>(); // Es
 // configuracion de Identity
 builder.Services.AddIdentity<User, Role>(options =>
 {
-    options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
-    options.Lockout.MaxFailedAccessAttempts = 5;
-    options.Lockout.AllowedForNewUsers = true;
-    options.Password.RequireDigit = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = false;
-    options.Password.RequiredLength = 6;
-    options.User.RequireUniqueEmail = true;
-    options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
+  options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+  options.Lockout.MaxFailedAccessAttempts = 5;
+  options.Lockout.AllowedForNewUsers = true;
+  options.Password.RequireDigit = true;
+  options.Password.RequireLowercase = true;
+  options.Password.RequireUppercase = true;
+  options.Password.RequireNonAlphanumeric = false;
+  options.Password.RequiredLength = 6;
+  options.User.RequireUniqueEmail = true;
+  options.User.AllowedUserNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
 })
 //.AddErrorDescriber<>()
 .AddDefaultTokenProviders() // // Esto es necesario para que Identity pueda generar tokens de autenticacion, como los de restablecimiento de contrasea o verificaci�n de correo electr�nico.
@@ -174,58 +194,56 @@ var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
 
 builder.Services
-    .AddAuthentication(options =>  
+    .AddAuthentication(options =>
     {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;  // Default: Bearer para auth
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;     // Default: Bearer para 401
+      options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;  // Default: Bearer para auth
+      options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;     // Default: Bearer para 401
     })
     .AddJwtBearer(opciones =>
     {
-        opciones.MapInboundClaims = false;
-        opciones.TokenValidationParameters = new TokenValidationParameters
+      opciones.MapInboundClaims = false;
+      opciones.TokenValidationParameters = new TokenValidationParameters
+      {
+        ValidateIssuer = false,
+        ValidateAudience = false,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = key,
+        ClockSkew = TimeSpan.Zero,
+      };
+      opciones.Events = new JwtBearerEvents
+      {
+        OnMessageReceived = context =>
         {
-          ValidateIssuer = false,
-          ValidateAudience = false,
-          ValidateLifetime = true,
-          ValidateIssuerSigningKey = true,
-          IssuerSigningKey = key,
-          ClockSkew = TimeSpan.Zero,
-        };
-        opciones.Events = new JwtBearerEvents
+          Console.WriteLine("¡JWT Message Received! (Bearer detectado)");
+          return Task.CompletedTask;
+        },
+        OnAuthenticationFailed = context =>
         {
-            OnMessageReceived = context =>
-            {
-                Console.WriteLine("¡JWT Message Received! (Bearer detectado)");
-                return Task.CompletedTask;
-            },
-            OnAuthenticationFailed = context =>
-            {
-                Console.WriteLine($"Token invalido: {context.Exception.Message}");
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = context =>
-            {
-                Console.WriteLine("Token valido");
-                return Task.CompletedTask;
-            },
-            OnChallenge = context =>
-            {
-                Console.WriteLine("No se proporciono token o auth requerida");
-                return Task.CompletedTask;
-            }
-        };
+          Console.WriteLine($"Token invalido: {context.Exception.Message}");
+          return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+          Console.WriteLine("Token valido");
+          return Task.CompletedTask;
+        },
+        OnChallenge = context =>
+        {
+          Console.WriteLine("No se proporciono token o auth requerida");
+          return Task.CompletedTask;
+        }
+      };
     });
 
 // Agregar servicio de autorización
 
 builder.Services.AddAuthorizationBuilder()
-    // Agregar servicio de autorización
     .AddPolicy("RequireAdmin", policy => policy.RequireClaim("roleId", "1"))
     .AddPolicy("RequireFrontDesk", policy => policy.RequireClaim("roleId", "1", "2"))
     .AddPolicy("RequireClinical", policy => policy.RequireClaim("roleId", "3", "4", "5"))
     .AddPolicy("RequireDoctorWrite", policy => policy.RequireClaim("roleId", "3"))
     .AddPolicy("RequireLabStaff", policy => policy.RequireClaim("roleId", "1", "5"));
-
 builder.Services.AddOpenApi();
 
 
@@ -233,7 +251,7 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+  app.MapOpenApi();
 }
 
 app.UseHttpsRedirection(); // Ahora va después de UseCors
@@ -251,4 +269,4 @@ app.UseCors("AllowFrontend"); // Mover aquí
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-    app.Run();
+app.Run();
