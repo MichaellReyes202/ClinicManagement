@@ -1,4 +1,4 @@
-﻿using Domain.Errors;
+using Domain.Errors;
 using Domain.Entities;
 using Application.DTOs.User;
 using Application.DTOs.Auth;
@@ -15,4 +15,5 @@ public interface IAuthService
     Task<AuthResponse> GenerateJwtTokenAsync(User user);
     Task<Result<AuthResponse>> GetUserOnly();
     Task<Result<UserDto>> ResetPasswordAsync(int userId);
+    Task<Result<bool>> ChangePasswordAsync(ChangePasswordDto dto);
 }

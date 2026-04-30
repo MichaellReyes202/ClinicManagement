@@ -1,4 +1,4 @@
-﻿
+
 using Application.DTOs.Auth;
 using Application.DTOs.User;
 using Application.Interfaces;
@@ -64,6 +64,17 @@ namespace API.Controllers
     {
       var result = await _authService.ResetPasswordAsync(id);
       return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
+    {
+      var result = await _authService.ChangePasswordAsync(dto);
+      return result.IsSuccess ? Ok(new { message = "Password changed successfully" }) : HandleFailure(result);
     }
 
   }

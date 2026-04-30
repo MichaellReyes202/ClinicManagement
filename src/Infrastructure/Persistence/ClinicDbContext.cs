@@ -365,6 +365,9 @@ public partial class ClinicDbContext : DbContext
             entity.Property(e => e.NormalizedEmail)
                 .HasMaxLength(255)
                 .HasColumnName("normalized_email");
+            entity.Property(e => e.PhotoUrl)
+                .HasMaxLength(500)
+                .HasColumnName("photo_url");
             entity.Property(e => e.PositionId).HasColumnName("position_id");
             entity.Property(e => e.SecondLastName)
                 .HasMaxLength(100)
@@ -876,6 +879,9 @@ public partial class ClinicDbContext : DbContext
             entity.Property(e => e.PasswordHash)
                 .HasMaxLength(255)
                 .HasColumnName("password_hash");
+            entity.Property(e => e.RequiresPasswordChange)
+                .HasDefaultValue(true)
+                .HasColumnName("requires_password_change");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
             entity.Property(e => e.UpdatedByUserId).HasColumnName("updated_by_user_id");
 

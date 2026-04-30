@@ -1,4 +1,4 @@
-﻿using Application.DTOs.Auth;
+using Application.DTOs.Auth;
 using Application.DTOs.User;
 using Application.Interfaces;
 using Application.Util;
@@ -37,17 +37,17 @@ public class AuthService : IAuthService
   private readonly IAuditlogServices _auditlogServices;
 
   public AuthService(
-      UserManager<User> userManager,
-      SignInManager<User> signInManager,
-      IConfiguration configuration,
-      IValidator<LoginDto> validator_login,
-      IValidator<RegisterDto> validatorRegister,
-      IMapper mapper,
-      IEmployesRepository employesRepository,
-      IRoleRepository roleRepository,
-      IUserRepository userRepository,
-      IUserService userService,
-      IAuditlogServices auditlogServices
+    UserManager<User> userManager,
+    SignInManager<User> signInManager,
+    IConfiguration configuration,
+    IValidator<LoginDto> validator_login,
+    IValidator<RegisterDto> validatorRegister,
+    IMapper mapper,
+    IEmployesRepository employesRepository,
+    IRoleRepository roleRepository,
+    IUserRepository userRepository,
+    IUserService userService,
+    IAuditlogServices auditlogServices
 
   )
   {
@@ -78,6 +78,8 @@ public class AuthService : IAuthService
     {
       return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "Invalid Credentials"));
     }
+
+    // Verificamos si el usuario esta bloqueado de antemano 
     if (await _userManager.IsLockedOutAsync(user))
     {
       var lockoutEnd = await _userManager.GetLockoutEndDateAsync(user);
@@ -134,7 +136,10 @@ public class AuthService : IAuthService
     }
 
     if (!result.Succeeded)
+    {
       return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unauthorized, "Invalid Credentials"));
+    }
+
 
     await _auditlogServices.RegisterLoginActionAsync(succes: result.Succeeded, user.Id, recordDisplay: user.Email);
     user.LastLogin = DateTime.UtcNow;
@@ -146,8 +151,6 @@ public class AuthService : IAuthService
 
 
   }
-
-
   public async Task<Result<UserDto>> RegisterAsync(RegisterDto registerDto)
   {
     var validationResult = await validatorRegister.ValidateAsync(registerDto);
@@ -235,7 +238,6 @@ public class AuthService : IAuthService
       return Result<UserDto>.Failure(new Error(ErrorCodes.Unexpected, ex.Message));
     }
   }
-
   public async Task<Result<AuthResponse>> GetUserOnly()
   {
     try
@@ -254,7 +256,6 @@ public class AuthService : IAuthService
       return Result<AuthResponse>.Failure(new Error(ErrorCodes.Unexpected, "Internal server Error"));
     }
   }
-
   public async Task<AuthResponse> GenerateJwtTokenAsync(User user)
   {
     var claims = new List<Claim>
@@ -303,7 +304,8 @@ public class AuthService : IAuthService
         IsActive = user.IsActive,
         Roles = [.. roles],
         RoleId = (await _roleRepository.GetQuery(r => roles.Contains(r.Name))).FirstOrDefault()?.Id ?? 0, // Agregar RoleId al response si es necesario
-        EmployeeId = user.EmployeeUser?.Id
+        EmployeeId = user.EmployeeUser?.Id,
+        RequiresPasswordChange = user.RequiresPasswordChange
       }
     };
   }
@@ -345,5 +347,43 @@ public class AuthService : IAuthService
     }
 
     return Result<UserDto>.Failure(new Error(ErrorCodes.Unexpected, "Failed to reset password"));
+  }
+
+  public async Task<Result<bool>> ChangePasswordAsync(ChangePasswordDto dto)
+  {
+    var user = await _userService.GetCurrentUserAsync();
+    if (user == null)
+      return Result<bool>.Failure(new Error(ErrorCodes.NotFound, "User not found"));
+
+    var result = await _userManager.ChangePasswordAsync(user, dto.CurrentPassword, dto.NewPassword);
+
+    if (result.Succeeded)
+    {
+      user.RequiresPasswordChange = false;
+      await _userRepository.UpdateAsync(user);
+      await _userRepository.SaveChangesAsync();
+
+      try
+      {
+        await _auditlogServices.RegisterActionAsync(
+            userId: user.Id,
+            module: AuditModuletype.Auth,
+            actionType: ActionType.UPDATE,
+            recordDisplay: user.Email,
+            recordId: user.Id,
+            status: AuditStatus.SUCCESS,
+            changeDetail: "User forced password change completed"
+        );
+      }
+      catch (Exception auditEx)
+      {
+        Console.WriteLine($"Error registering audit: {auditEx.Message}");
+      }
+
+      return Result<bool>.Success(true);
+    }
+
+    var errors = result.Errors.Select(e => new ValidationError(string.Empty, e.Description)).ToList();
+    return Result<bool>.Failure(errors);
   }
 }

@@ -31,6 +31,8 @@ public partial class User
 
     public DateTime? LockoutEnd { get; set; }
 
+    public bool RequiresPasswordChange { get; set; }
+
     public virtual ICollection<Appointment> AppointmentCreatedByUsers { get; set; } = new List<Appointment>();
 
     public virtual ICollection<Appointment> AppointmentUpdatedByUsers { get; set; } = new List<Appointment>();

@@ -1,9 +1,9 @@
 ﻿using Application.DTOs;
-using Application.DTOs.Employee;
 using Application.DTOs.Patient;
 using Application.Interfaces;
 using AutoMapper;
 using Domain.Entities;
+using Domain.Enums;
 using Domain.Errors;
 using Domain.Interfaces;
 using FluentValidation;
@@ -51,11 +51,11 @@ public class PatientServices : IPatientServices
     if (!string.IsNullOrEmpty(searchTerm))
     {
       searchFilter = e =>
-          (e.FirstName.ToLower().Contains(searchTerm) || // Solo el primer nombre
+          e.FirstName.ToLower().Contains(searchTerm) || // Solo el primer nombre
           (e.MiddleName != null && e.MiddleName.ToLower().Contains(searchTerm)) || // Si existe, el segundo nombre
            e.LastName.ToLower().Contains(searchTerm) || // Apellido
            (e.SecondLastName != null && e.SecondLastName.ToLower().Contains(searchTerm)) ||
-           (e.Dni != null && e.Dni.ToLower().Contains(searchTerm)));
+           (e.Dni != null && e.Dni.ToLower().Contains(searchTerm));
     }
     var (baseQuery, total) = await _patientRepository.GetQueryAndTotal(filter: searchFilter);
     var projectQuery = baseQuery
@@ -178,14 +178,14 @@ public class PatientServices : IPatientServices
         // Verificar que el dni no este registrado en otro usuario (primer verificar si se envio el dni)
         if (!string.IsNullOrEmpty(patient.Dni))
         {
-          var existDni = await _patientRepository.ExistAsync(c => c.Dni.ToUpper() == patient.Dni.ToUpper());
+          var existDni = await _patientRepository.ExistAsync(c => c.Dni!.ToUpper() == patient.Dni.ToUpper());
           if (existDni)
             return Result<PatientResponseDto>.Failure(new Error(ErrorCodes.Conflict, $"The ID number '{patient.Dni}' already exists.", "dni"));
         }
         // Verificar que el email no este registrado en otro usuario
         if (!string.IsNullOrEmpty(patient.ContactEmail))
         {
-          var existEmail = await _patientRepository.ExistAsync(c => c.ContactEmail.ToUpper() == patient.ContactEmail.ToUpper());
+          var existEmail = await _patientRepository.ExistAsync(c => c.ContactEmail!.ToUpper() == patient.ContactEmail.ToUpper());
           if (existEmail)
             return Result<PatientResponseDto>.Failure(new Error(ErrorCodes.Conflict, $"The email '{patient.ContactEmail}' already exists.", "contactEmail"));
         }
@@ -193,7 +193,7 @@ public class PatientServices : IPatientServices
         // Verificar el contactPhone
         if (!string.IsNullOrEmpty(patient.ContactPhone))
         {
-          var existPhone = await _patientRepository.ExistAsync(c => c.ContactPhone.ToUpper() == patient.ContactPhone.ToUpper());
+          var existPhone = await _patientRepository.ExistAsync(c => c.ContactPhone!.ToUpper() == patient.ContactPhone.ToUpper());
           if (existPhone)
             return Result<PatientResponseDto>.Failure(new Error(ErrorCodes.Conflict, $"The phone number '{patient.ContactPhone}' already exists.", "contactPhone"));
         }
@@ -230,8 +230,8 @@ public class PatientServices : IPatientServices
           var fullName = $"{paciente.FirstName} {paciente.LastName}".Trim();
           await _auditlogServices.RegisterActionAsync(
               userId: userOnly?.Id,
-              module: Domain.Enums.AuditModuletype.Patients,
-              actionType: Domain.Enums.ActionType.CREATE,
+              module: AuditModuletype.Patients,
+              actionType: ActionType.CREATE,
               recordDisplay: fullName,
               recordId: paciente.Id,
               status: Domain.Enums.AuditStatus.SUCCESS
@@ -264,117 +264,118 @@ public class PatientServices : IPatientServices
 
   public async Task<Result> UpdatePatientAsync(PatientUpdateDto dto, int patientId)
   {
+    // 1. Validación de Esquema (FluentValidation)
     var valitationResult = await _updateValidator.ValidateAsync(dto);
     if (!valitationResult.IsValid)
     {
-      var errors = valitationResult.Errors
-          .Select(e => new ValidationError(e.PropertyName, e.ErrorMessage))
-          .ToList();
-      return Result<PatientResponseDto>.Failure(errors);
+      var errors = valitationResult.Errors.Select(e => new ValidationError(e.PropertyName, e.ErrorMessage)).ToList();
+      return Result.Failure(errors);
     }
+
     try
     {
-      using var transacion = await _patientRepository.BeginTransactionAsync();
+      // 2. Obtención de datos (Fuera de la transacción para no bloquear la DB innecesariamente)
+      var userOnly = await _userService.GetCurrentUserAsync();
+      var query = await _patientRepository.GetQuery(
+          filter: c => c.Id == patientId,
+          include: q => q.Include(e => e.PatientGuardian)
+      );
+      var patient = await query.FirstOrDefaultAsync();
+
+      if (patient is null)
+        return Result.Failure(new Error(ErrorCodes.NotFound, $"El paciente con ID '{patientId}' no existe."));
+
+      if (dto.Id != patientId)
+        return Result.Failure(new Error(ErrorCodes.BadRequest, "El ID de la ruta no coincide con el ID del cuerpo de la petición."));
+
+
+      var uniquenessError = await CheckUniquenessAsync(dto, patientId);
+      if (uniquenessError != null) return Result.Failure(uniquenessError);
+
+      if (!await _catalogServices.ExistSexId(dto.SexId))
+        return Result.Failure(new Error(ErrorCodes.NotFound, $"El ID de sexo: {dto.SexId} no existe.", "sexId"));
+
+      if (dto.BloodTypeId.HasValue && !await _catalogServices.ExistBloodId(dto.BloodTypeId.Value))
+        return Result.Failure(new Error(ErrorCodes.NotFound, $"El ID de tipo de sangre: {dto.BloodTypeId} no existe.", "bloodTypeId"));
+
+      using var transaction = await _patientRepository.BeginTransactionAsync();
       try
       {
-        // obtener el usuario de la sesion
-        var userOnly = await _userService.GetCurrentUserAsync();
-
-        // buscar al paciente por su id 
-        var query = await _patientRepository.GetQuery(filter: c => c.Id == patientId, include: q => q.Include(e => e.PatientGuardian));
-        var patient = await query.FirstOrDefaultAsync();
-        if (patient is null)
-          return Result.Failure(new Error(ErrorCodes.NotFound, $"Patient with ID '{patientId}' does not exist."));
-
-        // verificar que el id del dto no sea diferente a id del parametro
-        if (dto.Id != patientId)
-          return Result.Failure(new Error(ErrorCodes.BadRequest, $"The patient {patientId} in the route does not match the ID sent in the request body {dto.Id}"));
-
-        // Verificar que el dni no este registrado en otro usuario (primer verificar si se envio el dni)
-        if (!string.IsNullOrEmpty(patient.Dni))
-        {
-          var existDni = await _patientRepository.ExistAsync(c => c.Dni.ToUpper() == patient.Dni.ToUpper() && c.Id != patientId);
-          if (existDni)
-            return Result.Failure(new Error(ErrorCodes.Conflict, $"The ID number '{patient.Dni}' already exists.", "dni"));
-        }
-        // Verificar que el email no este registrado en otro usuario
-        if (!string.IsNullOrEmpty(patient.ContactEmail))
-        {
-          var existEmail = await _patientRepository.ExistAsync(c => c.ContactEmail.ToUpper() == patient.ContactEmail.ToUpper() && c.Id != patientId);
-          if (existEmail)
-            return Result.Failure(new Error(ErrorCodes.Conflict, $"The email '{patient.ContactEmail}' already exists.", "contactEmail"));
-        }
-
-        // Verificar el contactPhone
-        if (!string.IsNullOrEmpty(patient.ContactPhone))
-        {
-          var existPhone = await _patientRepository.ExistAsync(c => c.ContactPhone.ToUpper() == patient.ContactPhone.ToUpper() && c.Id != patientId);
-          if (existPhone)
-            return Result.Failure(new Error(ErrorCodes.Conflict, $"The phone number '{patient.ContactPhone}' already exists.", "contactPhone"));
-        }
-
-        // verificar que el id del sexo exista
-        var existSex = await _catalogServices.ExistSexId(patient.SexId);
-        if (!existSex)
-        {
-          return Result.Failure(new Error(ErrorCodes.NotFound, $"The sex id : {patient.SexId} was not found", "SexId"));
-        }
-        // Verificar que el id del tipo de sangre exista
-        if (patient.BloodTypeId.HasValue)
-        {
-          var existBlood = await _catalogServices.ExistBloodId(patient.BloodTypeId.Value);
-          if (!existBlood)
-          {
-            return Result.Failure(new Error(ErrorCodes.NotFound, $"The blood type id : {patient.BloodTypeId} was not found", "BloodTypeId"));
-          }
-        }
-        // mapear los cambios del dto al paciente
-
+        // Mapeo general (Campos básicos)
         _mapper.Map(dto, patient);
 
-        if (patient.PatientGuardian != null)
+        // Manejo del Guardián (Crear si no existe, actualizar si ya existe)
+        if (dto.Guardian != null)
         {
-          var guardian = _mapper.Map<PatientGuardian>(dto.Guardian);
-          patient.PatientGuardian = guardian;
+          if (patient.PatientGuardian == null)
+            patient.PatientGuardian = _mapper.Map<PatientGuardian>(dto.Guardian);
+          else
+            _mapper.Map(dto.Guardian, patient.PatientGuardian);
         }
+
         patient.UpdatedByUserId = userOnly?.Id;
 
         await _patientRepository.UpdatePatientAsync(patient);
         await _patientRepository.SaveChangesAsync();
 
-        // Registrar auditoría
-        try
-        {
-          var fullName = $"{patient.FirstName} {patient.LastName}".Trim();
-          await _auditlogServices.RegisterActionAsync(
-              userId: userOnly?.Id,
-              module: Domain.Enums.AuditModuletype.Patients,
-              actionType: Domain.Enums.ActionType.UPDATE,
-              recordDisplay: fullName,
-              recordId: patient.Id,
-              status: Domain.Enums.AuditStatus.SUCCESS
-          );
-        }
-        catch (Exception auditEx)
-        {
-          Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
-        }
+        // Auditoría (Llamada asíncrona pero segura)
+        await RegisterPatientAudit(userOnly?.Id.ToString(), patient, ActionType.UPDATE);
 
-        await transacion.CommitAsync();
-
+        await transaction.CommitAsync();
         return Result.Success();
-
       }
-      catch (DbUpdateException ex)
+      catch (DbUpdateException)
       {
-        await transacion.RollbackAsync();
-        return Result.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
+        await transaction.RollbackAsync();
+        return Result.Failure(new Error(ErrorCodes.Conflict, "Hubo un conflicto de datos únicos en la base de datos."));
       }
-
     }
     catch (Exception ex)
     {
-      return Result.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred{ex.Message}"));
+      return Result.Failure(new Error(ErrorCodes.Unexpected, $"Error inesperado: {ex.Message}"));
     }
   }
+
+  // --- MÉTODOS PRIVADOS DE APOYO (HELPERS) ---
+
+  private async Task<Error?> CheckUniquenessAsync(PatientUpdateDto dto, int patientId)
+  {
+    if (!string.IsNullOrWhiteSpace(dto.Dni))
+    {
+      if (await _patientRepository.ExistAsync(c => c.Dni!.ToUpper() == dto.Dni.ToUpper() && c.Id != patientId))
+        return new Error(ErrorCodes.Conflict, $"La cédula '{dto.Dni}' ya está registrada.", "dni");
+    }
+
+    if (!string.IsNullOrWhiteSpace(dto.ContactEmail))
+    {
+      if (await _patientRepository.ExistAsync(c => c.ContactEmail!.ToUpper() == dto.ContactEmail.ToUpper() && c.Id != patientId))
+        return new Error(ErrorCodes.Conflict, $"El correo '{dto.ContactEmail}' ya está registrado.", "contactEmail");
+    }
+
+    if (!string.IsNullOrWhiteSpace(dto.ContactPhone))
+    {
+      if (await _patientRepository.ExistAsync(c => c.ContactPhone!.ToUpper() == dto.ContactPhone.ToUpper() && c.Id != patientId))
+        return new Error(ErrorCodes.Conflict, $"El teléfono '{dto.ContactPhone}' ya está registrado.", "contactPhone");
+    }
+
+    return null;
+  }
+
+  private async Task RegisterPatientAudit(string? userId, Patient patient, ActionType action)
+  {
+    try
+    {
+      var fullName = $"{patient.FirstName} {patient.LastName}".Trim();
+      await _auditlogServices.RegisterActionAsync(
+          userId: int.Parse(userId!),
+          module: Domain.Enums.AuditModuletype.Patients,
+          actionType: action,
+          recordDisplay: fullName,
+          recordId: patient.Id,
+          status: Domain.Enums.AuditStatus.SUCCESS
+      );
+    }
+    catch { /* Ignorar fallos en logs para no romper el flujo principal */ }
+  }
+
 }

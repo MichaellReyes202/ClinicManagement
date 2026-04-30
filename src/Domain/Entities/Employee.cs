@@ -43,6 +43,8 @@ public partial class Employee
 
     public DateTime UpdatedAt { get; set; }
 
+    public string? PhotoUrl { get; set; }
+
     public virtual ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
 
     public virtual ICollection<Consultation> Consultations { get; set; } = new List<Consultation>();

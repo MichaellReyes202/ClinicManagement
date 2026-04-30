@@ -1,30 +1,52 @@
 ﻿
 
-
 namespace Domain.Errors
 {
-    public record ErrorCodes
-    {
+  public static class ErrorCodes
+  {
+    // 400 - Bad Request
+    public const string BadRequest = "BadRequest";
+    public const string ValidationError = "ValidationError";
+    public const string MissingRequiredField = "MissingRequiredField";
+    public const string InvalidFormat = "InvalidFormat";
 
-        /// Indica que la solicitud del cliente es inválida, falta información, o hay inconsistencia de IDs (HTTP 400)
-        public const string BadRequest = "BadRequest";
+    // 401 - Unauthorized
+    public const string Unauthorized = "Unauthorized";
+    public const string InvalidCredentials = "InvalidCredentials";
+    public const string TokenExpired = "TokenExpired";
+    public const string InvalidToken = "InvalidToken";
 
-        /// Indica que un recurso ya existe y viola una restricción de unicidad (e.g., email, DNI ya en uso) (HTTP 409).
-        public const string Conflict = "Conflict";
+    // 403 - Forbidden
+    public const string Forbidden = "Forbidden";
+    public const string InsufficientPermissions = "InsufficientPermissions";
 
-        /// Indica que el recurso solicitado o una dependencia no fue encontrada (HTTP 404).
-        public const string NotFound = "NotFound";
+    // 404 - Not Found
+    public const string NotFound = "NotFound";
+    public const string ResourceNotFound = "ResourceNotFound";
 
-        /// Indica que las credenciales son inválidas o que el usuario no está autorizado (HTTP 401).
-        public const string Unauthorized = "Unauthorized";
+    // 405 - Method Not Allowed
+    public const string MethodNotAllowed = "MethodNotAllowed";
 
-        /// Indica que la cuenta ha sido bloqueada debido a demasiados intentos fallidos (HTTP 429).
-        public const string TooManyRequests = "TooManyRequests";
+    // 409 - Conflict
+    public const string Conflict = "Conflict";
+    public const string DuplicateResource = "DuplicateResource";
+    public const string ResourceAlreadyExists = "ResourceAlreadyExists";
 
-        /// Indica una excepción de sistema o error de base de datos no controlado (HTTP 500).
-        public const string Unexpected = "Unexpected";
+    // 422 - Unprocessable Entity
+    public const string UnprocessableEntity = "UnprocessableEntity";
+    public const string BusinessRuleViolation = "BusinessRuleViolation";
 
-    }
+    // 429 - Too Many Requests
+    public const string TooManyRequests = "TooManyRequests";
+    public const string RateLimitExceeded = "RateLimitExceeded";
 
+    // 500 - Internal Server Error
+    public const string Unexpected = "Unexpected";
+    public const string InternalServerError = "InternalServerError";
+    public const string DatabaseError = "DatabaseError";
+    public const string ExternalServiceError = "ExternalServiceError";
 
+    // 503 - Service Unavailable
+    public const string ServiceUnavailable = "ServiceUnavailable";
+  }
 }
