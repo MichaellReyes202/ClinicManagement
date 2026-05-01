@@ -1,4 +1,4 @@
-﻿
+
 using API.Filters;
 using Application.Interfaces;
 using Application.Mappers;
@@ -44,7 +44,20 @@ builder.Services.AddControllers(options =>
 // Configurar DbContext con PostgreSQL
 builder.Services.AddDbContext<ClinicDbContext>(options =>
 {
-  options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"));
+  options.UseNpgsql(
+    builder.Configuration.GetConnectionString("DefaultConnection"),
+    npgsqlOptions =>
+    {
+      // Reintentos automáticos ante fallos transitorios (cold-start de Neon.tech)
+      npgsqlOptions.EnableRetryOnFailure(
+        maxRetryCount: 3,
+        maxRetryDelay: TimeSpan.FromSeconds(5),
+        errorCodesToAdd: null
+      );
+      // Timeout extendido para la autenticación en cold-start
+      npgsqlOptions.CommandTimeout(30);
+    }
+  );
 });
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
@@ -149,6 +162,19 @@ builder.Services.AddScoped<IGenericRepository<Exam>, ExamRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IExamTypeServices, ExamTypeServices>();
 
+builder.Services.Configure<Application.Models.MailSettings>(builder.Configuration.GetSection("EMAIL_SETTINGS"));
+builder.Services.AddTransient<IEmailService, EmailService>();
+builder.Services.AddMemoryCache();
+
+// Supabase Configuration
+var supabaseUrl = builder.Configuration["Supabase:Url"];
+var supabaseKey = builder.Configuration["Supabase:Key"];
+if (!string.IsNullOrEmpty(supabaseUrl) && !string.IsNullOrEmpty(supabaseKey))
+{
+    var options = new Supabase.SupabaseOptions { AutoConnectRealtime = false };
+    builder.Services.AddSingleton<Supabase.Client>(_ => new Supabase.Client(supabaseUrl, supabaseKey, options));
+    builder.Services.AddScoped<ISupabaseService, SupabaseService>();
+}
 QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 

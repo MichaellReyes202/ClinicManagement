@@ -18,4 +18,5 @@ public enum ActionType
     // 3. Acciones Específicas del Negocio
     STATUS_CHANGE = 20,   // Cambio de estado (Ej: Cita de Programada a Cancelada)
     REPORT_GENERATED = 21,
+    RESET_PASSWORD = 22,
 }

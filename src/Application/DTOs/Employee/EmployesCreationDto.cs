@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,4 +20,5 @@ public class EmployesCreationDto
     public required string Dni { get; set; } 
     public int? SpecialtyId { get; set; } 
     public string Email { get; set; } = null!; 
+    public IFormFile? Photo { get; set; }
 }

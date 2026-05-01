@@ -1,4 +1,4 @@
-﻿using Application.DTOs;
+using Application.DTOs;
 using Application.DTOs.Employee;
 using Application.Interfaces;
 using AutoMapper;
@@ -23,6 +23,8 @@ public class EmployesServices : IEmployesServices
     private readonly IUserService _userService;
     private readonly IAuditlogServices _auditlogServices;
 
+    private readonly ISupabaseService _supabaseService;
+
     public EmployesServices
     (
         IEmployesRepository employeesRepository,
@@ -33,7 +35,8 @@ public class EmployesServices : IEmployesServices
         ISpecialtiesRepository specialtiesRepository,
         IPositionRepository positionRepository,
         IUserService userService,
-        IAuditlogServices auditlogServices
+        IAuditlogServices auditlogServices,
+        ISupabaseService supabaseService
     )
     {
         _employeesRepository = employeesRepository;
@@ -45,6 +48,7 @@ public class EmployesServices : IEmployesServices
         _positionRepository = positionRepository;
         _userService = userService;
         _auditlogServices = auditlogServices;
+        _supabaseService = supabaseService;
     }
 
     public async Task<Result<PaginatedResponseDto<EmployeeSearchDto>>> EmployeesWithoutUsers(PaginationDto pagination)
@@ -79,7 +83,15 @@ public class EmployesServices : IEmployesServices
     {
         try
         {
-            var (baseQuery, total) = await _employeesRepository.GetQueryAndTotal(include: q => q.Include(e => e.Position).Include(e => e.Specialty));
+            Expression<Func<Employee, bool>>? filter = null;
+            if (!string.IsNullOrWhiteSpace(pagination.Query))
+            {
+                var q = pagination.Query.ToLower();
+                filter = e => e.FirstName.ToLower().Contains(q) || 
+                              e.LastName.ToLower().Contains(q) || 
+                              (e.Dni != null && e.Dni.ToLower().Contains(q));
+            }
+            var (baseQuery, total) = await _employeesRepository.GetQueryAndTotal(filter: filter, include: q => q.Include(e => e.Position).Include(e => e.Specialty));
             var projectedQuery = baseQuery
                 .AsNoTracking()
                 .Select(e => new EmployeeListDTO
@@ -94,6 +106,7 @@ public class EmployesServices : IEmployesServices
                     IsActive = e.IsActive,
                     PositionId = e.PositionId,
                     SpecialtyId = e.SpecialtyId,
+                    PhotoUrl = e.PhotoUrl,
                 });
             var items = await projectedQuery
                 .Skip(pagination.Offset)
@@ -178,6 +191,19 @@ public class EmployesServices : IEmployesServices
                 var employee = _mapper.Map<Employee>(employes);
                 employee.CreatedByUserId = userOnly?.Id;
                 employee.UpdatedByUserId = userOnly?.Id;
+
+                // Upload photo if present
+                if (employes.Photo != null)
+                {
+                    var extension = Path.GetExtension(employes.Photo.FileName);
+                    var fileName = $"{Guid.NewGuid()}{extension}";
+                    var photoUrl = await _supabaseService.UploadImageAsync(employes.Photo, "clinica", fileName);
+                    if (!string.IsNullOrEmpty(photoUrl))
+                    {
+                        employee.PhotoUrl = photoUrl;
+                    }
+                }
+
                 await _employeesRepository.AddAsync(employee);
                 await _employeesRepository.SaveChangesAsync();
 
@@ -273,7 +299,7 @@ public class EmployesServices : IEmployesServices
 
 
                 // Verificar si deshabilito el empleado , se tiene que deshabilitar el usuario ( si es que lo esta)
-                if (employe.UserId.HasValue && employe.UserId > 0)
+                if (employe.UserId.HasValue && employe.UserId > 0 && dto.IsActive == false)
                 {
                     var userAssigned = await _userRepository.GetByIdAsync((int)employe.UserId);
                     if (userAssigned != null)
@@ -286,6 +312,19 @@ public class EmployesServices : IEmployesServices
                 // mapear del dto a la entidad empleado 
                 _mapper.Map(dto, employe);
                 employe.UpdatedByUserId = userOnly!.Id;
+
+                // Upload photo if present
+                if (dto.Photo != null)
+                {
+                    var extension = Path.GetExtension(dto.Photo.FileName);
+                    var fileName = $"{Guid.NewGuid()}{extension}";
+                    var photoUrl = await _supabaseService.UploadImageAsync(dto.Photo, "clinica", fileName);
+                    if (!string.IsNullOrEmpty(photoUrl)) 
+                    {
+                        employe.PhotoUrl = photoUrl;
+                    }
+                }
+
                 await _employeesRepository.UpdateEmployeeAsync(employe);
                 await _employeesRepository.SaveChangesAsync();
 

@@ -1,4 +1,4 @@
-﻿
+
 using Application.DTOs;
 using Application.Interfaces;
 using Domain.Errors;
@@ -62,7 +62,7 @@ namespace API.Controllers
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> CreateEmployee(EmployesCreationDto employes)
+    public async Task<IActionResult> CreateEmployee([FromForm] EmployesCreationDto employes)
     {
       var result = await _employesServices.AddEmployesAsync(employes);
       return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
@@ -77,7 +77,7 @@ namespace API.Controllers
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
 
-    public async Task<IActionResult> UpdateEmployee([FromBody] EmployesUpdateDto dto, int Id)
+    public async Task<IActionResult> UpdateEmployee([FromForm] EmployesUpdateDto dto, int Id)
     {
       var result = await _employesServices.UpdateEmployesAsync(dto, Id);
       return result.IsSuccess ? NoContent() : HandleFailure(result);

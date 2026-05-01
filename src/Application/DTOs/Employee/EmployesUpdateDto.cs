@@ -1,4 +1,5 @@
-﻿using Domain.Entities;
+using Domain.Entities;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Win32;
 using System;
@@ -23,4 +24,5 @@ public class EmployesUpdateDto
     public required string Email { get; set; }
     public  bool IsActive { get; set; }
     public  int? SpecialtyId  { get; set; }
+    public IFormFile? Photo { get; set; }
 }

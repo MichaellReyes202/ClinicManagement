@@ -16,4 +16,6 @@ public interface IAuthService
     Task<Result<AuthResponse>> GetUserOnly();
     Task<Result<UserDto>> ResetPasswordAsync(int userId);
     Task<Result<bool>> ChangePasswordAsync(ChangePasswordDto dto);
+    Task<Result<bool>> ForgotPasswordAsync(ForgotPasswordDto dto);
+    Task<Result<bool>> ResetPasswordWithCodeAsync(ResetPasswordWithCodeDto dto);
 }

@@ -77,5 +77,24 @@ namespace API.Controllers
       return result.IsSuccess ? Ok(new { message = "Password changed successfully" }) : HandleFailure(result);
     }
 
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
+    {
+      var result = await _authService.ForgotPasswordAsync(dto);
+      return result.IsSuccess ? Ok(new { message = "If the email is valid, a recovery code has been sent." }) : HandleFailure(result);
+    }
+
+    [HttpPost("reset-password-code")]
+    [AllowAnonymous]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult> ResetPasswordWithCode([FromBody] ResetPasswordWithCodeDto dto)
+    {
+      var result = await _authService.ResetPasswordWithCodeAsync(dto);
+      return result.IsSuccess ? Ok(new { message = "Password reset successfully" }) : HandleFailure(result);
+    }
   }
 }
