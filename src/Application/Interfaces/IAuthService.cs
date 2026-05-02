@@ -18,4 +18,5 @@ public interface IAuthService
     Task<Result<bool>> ChangePasswordAsync(ChangePasswordDto dto);
     Task<Result<bool>> ForgotPasswordAsync(ForgotPasswordDto dto);
     Task<Result<bool>> ResetPasswordWithCodeAsync(ResetPasswordWithCodeDto dto);
+    Task<Result<bool>> AdminResetPasswordByEmailAsync(AdminResetPasswordDto dto);
 }

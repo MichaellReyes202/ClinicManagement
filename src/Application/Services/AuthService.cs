@@ -372,6 +372,84 @@ public class AuthService : IAuthService
     return Result<UserDto>.Failure(new Error(ErrorCodes.Unexpected, "Failed to reset password"));
   }
 
+  /// <summary>
+  /// Nuevo flujo: el administrador ingresa su contraseña para confirmar la acción.
+  /// En lugar de asignar una contraseña temporal, se envía el mismo correo de
+  /// "recuperación de contraseña" al correo personal del empleado objetivo.
+  /// </summary>
+  public async Task<Result<bool>> AdminResetPasswordByEmailAsync(AdminResetPasswordDto dto)
+  {
+    // 1. Obtener el admin que realiza la acción
+    var adminEmail = await _userService.GetEmailUserOnlyAsync();
+    if (adminEmail == null)
+      return Result<bool>.Failure(new Error(ErrorCodes.Unauthorized, "No se pudo identificar al administrador."));
+
+    var adminUser = await _userRepository.GetUserWithEmployeeByEmailAsync(adminEmail);
+    if (adminUser == null)
+      return Result<bool>.Failure(new Error(ErrorCodes.Unauthorized, "Administrador no encontrado."));
+
+    // 2. Verificar contraseña del admin
+    var passwordValid = await _userManager.CheckPasswordAsync(adminUser, dto.AdminPassword);
+    if (!passwordValid)
+      return Result<bool>.Failure(new Error(ErrorCodes.Unauthorized, "Contraseña del administrador incorrecta."));
+
+    // 3. Buscar el usuario objetivo
+    var targetUser = await _userRepository.GetUserWithEmployeeByIdAsync(dto.TargetUserId);
+    if (targetUser == null)
+      return Result<bool>.Failure(new Error(ErrorCodes.NotFound, "Usuario objetivo no encontrado."));
+
+    if (targetUser.EmployeeUser == null || string.IsNullOrEmpty(targetUser.EmployeeUser.Email))
+      return Result<bool>.Failure(new Error(ErrorCodes.Conflict, "El empleado no tiene correo personal registrado. Registre uno para poder restablecer la contraseña."));
+
+    // 4. Generar y guardar código en caché (igual que ForgotPassword)
+    var random = new Random();
+    var code = random.Next(100000, 999999).ToString();
+    _memoryCache.Set($"pwd_reset_{targetUser.Email}", code, TimeSpan.FromMinutes(5));
+
+    // 5. Enviar correo de recuperación al correo personal del empleado
+    var resetLink = $"{_configuration["FrontendUrl"] ?? "http://localhost:5173"}/auth/reset-password?email={targetUser.Email}";
+    var subject = "Restablecimiento de contraseña - Clínica Oficentro";
+    var body = $@"
+      <p>Hola {targetUser.EmployeeUser.FirstName},</p>
+      <p>El administrador ha solicitado restablecer tu contraseña.</p>
+      <p>Tu código de recuperación es: <strong>{code}</strong></p>
+      <p>Este código es válido por 5 minutos.</p>
+      <p>Ingresa al siguiente enlace para crear tu nueva contraseña:
+         <a href='{resetLink}'>Restablecer contraseña</a>
+      </p>
+    ";
+
+    try
+    {
+      await _emailService.SendEmailAsync(targetUser.EmployeeUser.Email, subject, body);
+
+      await _auditlogServices.RegisterActionAsync(
+        userId: adminUser.Id,
+        module: AuditModuletype.Auth,
+        actionType: ActionType.RESET_PASSWORD,
+        recordDisplay: targetUser.Email,
+        recordId: targetUser.Id,
+        status: AuditStatus.SUCCESS,
+        changeDetail: $"Admin '{adminEmail}' solicitó restablecimiento de contraseña para '{targetUser.Email}'."
+      );
+
+      return Result<bool>.Success(true);
+    }
+    catch (Exception ex)
+    {
+      await _auditlogServices.RegisterActionAsync(
+        userId: adminUser.Id,
+        module: AuditModuletype.Auth,
+        actionType: ActionType.RESET_PASSWORD,
+        recordDisplay: targetUser.Email,
+        recordId: targetUser.Id,
+        status: AuditStatus.FAILURE,
+        changeDetail: $"Error al enviar correo de restablecimiento: {ex.Message}"
+      );
+      throw;
+    }
+  }
+
   public async Task<Result<bool>> ChangePasswordAsync(ChangePasswordDto dto)
   {
     var user = await _userService.GetCurrentUserAsync();

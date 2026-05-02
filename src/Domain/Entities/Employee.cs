@@ -45,11 +45,15 @@ public partial class Employee
 
     public string? PhotoUrl { get; set; }
 
+    public int AppointmentDurationMinutes { get; set; }
+
     public virtual ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
 
     public virtual ICollection<Consultation> Consultations { get; set; } = new List<Consultation>();
 
     public virtual User? CreatedByUser { get; set; }
+
+    public virtual ICollection<EmployeeSchedule> EmployeeSchedules { get; set; } = new List<EmployeeSchedule>();
 
     public virtual ICollection<Exam> Exams { get; set; } = new List<Exam>();
 

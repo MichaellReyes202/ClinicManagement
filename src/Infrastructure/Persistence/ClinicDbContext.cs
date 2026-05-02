@@ -32,9 +32,13 @@ public partial class ClinicDbContext : DbContext
 
     public virtual DbSet<CatSexo> CatSexos { get; set; }
 
+    public virtual DbSet<ClinicSchedule> ClinicSchedules { get; set; }
+
     public virtual DbSet<Consultation> Consultations { get; set; }
 
     public virtual DbSet<Employee> Employees { get; set; }
+
+    public virtual DbSet<EmployeeSchedule> EmployeeSchedules { get; set; }
 
     public virtual DbSet<Exam> Exams { get; set; }
 
@@ -255,6 +259,36 @@ public partial class ClinicDbContext : DbContext
                 .HasColumnName("name");
         });
 
+        modelBuilder.Entity<ClinicSchedule>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("clinic_schedules_pkey");
+
+            entity.ToTable("clinic_schedules");
+
+            entity.HasIndex(e => e.DayOfWeek, "uq_clinic_day").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CloseTime)
+                .HasDefaultValueSql("'17:00:00'::time without time zone")
+                .HasColumnName("close_time");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at");
+            entity.Property(e => e.DayName)
+                .HasMaxLength(15)
+                .HasColumnName("day_name");
+            entity.Property(e => e.DayOfWeek).HasColumnName("day_of_week");
+            entity.Property(e => e.IsOpen)
+                .HasDefaultValue(true)
+                .HasColumnName("is_open");
+            entity.Property(e => e.OpenTime)
+                .HasDefaultValueSql("'08:00:00'::time without time zone")
+                .HasColumnName("open_time");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("updated_at");
+        });
+
         modelBuilder.Entity<Consultation>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("consultations_pkey");
@@ -338,6 +372,9 @@ public partial class ClinicDbContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Age).HasColumnName("age");
+            entity.Property(e => e.AppointmentDurationMinutes)
+                .HasDefaultValue(30)
+                .HasColumnName("appointment_duration_minutes");
             entity.Property(e => e.ContactPhone)
                 .HasMaxLength(8)
                 .HasColumnName("contact_phone");
@@ -401,6 +438,40 @@ public partial class ClinicDbContext : DbContext
                 .HasForeignKey<Employee>(d => d.UserId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .HasConstraintName("employees_user_id_fkey");
+        });
+
+        modelBuilder.Entity<EmployeeSchedule>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("employee_schedules_pkey");
+
+            entity.ToTable("employee_schedules");
+
+            entity.HasIndex(e => e.EmployeeId, "idx_emp_schedules_employee");
+
+            entity.HasIndex(e => new { e.EmployeeId, e.DayOfWeek }, "uq_employee_day").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at");
+            entity.Property(e => e.DayOfWeek).HasColumnName("day_of_week");
+            entity.Property(e => e.EmployeeId).HasColumnName("employee_id");
+            entity.Property(e => e.EndTime)
+                .HasDefaultValueSql("'17:00:00'::time without time zone")
+                .HasColumnName("end_time");
+            entity.Property(e => e.IsAvailable)
+                .HasDefaultValue(true)
+                .HasColumnName("is_available");
+            entity.Property(e => e.StartTime)
+                .HasDefaultValueSql("'08:00:00'::time without time zone")
+                .HasColumnName("start_time");
+            entity.Property(e => e.UpdatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("updated_at");
+
+            entity.HasOne(d => d.Employee).WithMany(p => p.EmployeeSchedules)
+                .HasForeignKey(d => d.EmployeeId)
+                .HasConstraintName("employee_schedules_employee_id_fkey");
         });
 
         modelBuilder.Entity<Exam>(entity =>

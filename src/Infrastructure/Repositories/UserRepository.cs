@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 using Domain.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -101,12 +101,19 @@ namespace Infrastructure.Repositories
             await _context.SaveChangesAsync();
         }
 
-        public Task<User?> GetUserWithEmployeeByEmailAsync(string email )
+        public Task<User?> GetUserWithEmployeeByEmailAsync(string email)
         {
             var emailNormalized = email.ToUpper();
             return _context.Users
                 .Include(u => u.EmployeeUser)
                 .FirstOrDefaultAsync(u => u.NormalizedEmail == emailNormalized);
+        }
+
+        public Task<User?> GetUserWithEmployeeByIdAsync(int userId)
+        {
+            return _context.Users
+                .Include(u => u.EmployeeUser)
+                .FirstOrDefaultAsync(u => u.Id == userId);
         }
 
 

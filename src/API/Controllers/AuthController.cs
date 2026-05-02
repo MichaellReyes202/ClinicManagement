@@ -66,6 +66,18 @@ namespace API.Controllers
       return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
     }
 
+    [HttpPost("admin-reset-password-email")]
+    [Authorize(Policy = "RequireAdmin")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult> AdminResetPasswordByEmail([FromBody] AdminResetPasswordDto dto)
+    {
+      var result = await _authService.AdminResetPasswordByEmailAsync(dto);
+      return result.IsSuccess ? Ok(new { message = "Se ha enviado un correo de recuperación al empleado." }) : HandleFailure(result);
+    }
+
     [HttpPost("change-password")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]

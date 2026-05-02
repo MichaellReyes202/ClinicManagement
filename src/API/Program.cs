@@ -162,6 +162,11 @@ builder.Services.AddScoped<IGenericRepository<Exam>, ExamRepository>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IExamTypeServices, ExamTypeServices>();
 
+// Schedules
+builder.Services.AddScoped<IGenericRepository<ClinicSchedule>, GenericRepository<ClinicSchedule>>();
+builder.Services.AddScoped<IGenericRepository<EmployeeSchedule>, GenericRepository<EmployeeSchedule>>();
+builder.Services.AddScoped<IScheduleService, ScheduleService>();
+
 builder.Services.Configure<Application.Models.MailSettings>(builder.Configuration.GetSection("EMAIL_SETTINGS"));
 builder.Services.AddTransient<IEmailService, EmailService>();
 builder.Services.AddMemoryCache();

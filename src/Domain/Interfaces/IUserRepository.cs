@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 
 // Define métodos para el acceso a datos del usuario
 namespace Domain.Interfaces
@@ -25,6 +25,7 @@ namespace Domain.Interfaces
 
         // metodo para obteener el usuario con con el empleado relacionado
         Task<User?> GetUserWithEmployeeByEmailAsync(string email);
+        Task<User?> GetUserWithEmployeeByIdAsync(int userId);
 
     }
 }
