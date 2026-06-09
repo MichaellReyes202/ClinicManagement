@@ -1,4 +1,4 @@
-﻿using Application.DTOs;
+using Application.DTOs;
 using Application.DTOs.Employee;
 using Application.DTOs.ExamType;
 using Application.DTOs.Patient;
@@ -110,8 +110,7 @@ public class ExamTypeServices : IExamTypeServices
         }
         try
         {
-            using var transacion = await _examTypeRepository.BeginTransactionAsync();
-            try
+            return await _examTypeRepository.ExecuteInTransactionAsync(async () =>
             {
                 // obtener el usuario de la sesion
                 var userOnly = await _userService.GetCurrentUserAsync();
@@ -135,18 +134,14 @@ public class ExamTypeServices : IExamTypeServices
 
                 await _examTypeRepository.AddAsync(examtype);
                 await _examTypeRepository.SaveChangesAsync();
-                await transacion.CommitAsync();
 
                 var examDto = _mapper.Map<ExamTypeResponseDto>(examtype);
                 return Result<ExamTypeResponseDto>.Success(examDto);
-
-            }
-            catch (DbUpdateException ex)
-            {
-                await transacion.RollbackAsync();
-                return Result<ExamTypeResponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
-            }
-
+            });
+        }
+        catch (DbUpdateException)
+        {
+            return Result<ExamTypeResponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
         }
         catch (Exception ex)
         {
@@ -184,8 +179,7 @@ public class ExamTypeServices : IExamTypeServices
         }
         try
         {
-            using var transacion = await _examTypeRepository.BeginTransactionAsync();
-            try
+            return await _examTypeRepository.ExecuteInTransactionAsync(async () =>
             {
                 // obtener el usuario de la sesion
                 var userOnly = await _userService.GetCurrentUserAsync();
@@ -219,16 +213,12 @@ public class ExamTypeServices : IExamTypeServices
 
                 await _examTypeRepository.Update(examtype);
                 await _examTypeRepository.SaveChangesAsync();
-                await transacion.CommitAsync();
                 return Result.Success();
-
-            }
-            catch (DbUpdateException ex)
-            {
-                await transacion.RollbackAsync();
-                return Result<ExamTypeResponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
-            }
-
+            });
+        }
+        catch (DbUpdateException)
+        {
+            return Result<ExamTypeResponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
         }
         catch (Exception ex)
         {

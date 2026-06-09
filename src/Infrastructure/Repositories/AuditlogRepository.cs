@@ -4,12 +4,18 @@ using Domain.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace Infrastructure.Repositories;
-public class AuditlogRepository(ClinicDbContext context) : GenericRepository<Auditlog>(context) , IAuditlogRepository
+namespace Infrastructure.Repositories
 {
-    public Task UpdateAsync(Auditlog auditlog)
+    public class AuditlogRepository : GenericRepository<Auditlog>, IAuditlogRepository
     {
-        dbSet.Entry(auditlog).State = EntityState.Modified;
-        return Task.CompletedTask;
+        public AuditlogRepository(ClinicDbContext context) : base(context)
+        {
+        }
+
+        public override Task UpdateAsync(Auditlog auditlog)
+        {
+            _context.Entry(auditlog).State = EntityState.Modified;
+            return Task.CompletedTask;
+        }
     }
-}
+} 

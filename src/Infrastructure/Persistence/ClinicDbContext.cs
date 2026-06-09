@@ -69,8 +69,15 @@ public partial class ClinicDbContext : DbContext
     public virtual DbSet<UserRole> UserRoles { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseNpgsql("Host=ep-blue-tree-aed8hhdt-pooler.c-2.us-east-2.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=npg_jGxmaYBT1QN6;SSL Mode=Require");
+    {
+        // Configuration should be provided via DI (AddDbContext). If the options builder
+        // is not configured (e.g., when using design-time tools), we intentionally do nothing
+        // to avoid embedding secrets in source code.
+        if (!optionsBuilder.IsConfigured)
+        {
+            // Leave unconfigured; expect configuration from the host application's services.
+        }
+    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

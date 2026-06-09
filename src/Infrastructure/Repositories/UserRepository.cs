@@ -10,11 +10,8 @@ namespace Infrastructure.Repositories
 {
     public class UserRepository : GenericRepository<User> , IUserRepository
     {
-        private readonly ClinicDbContext _context;
-
         public UserRepository(ClinicDbContext context) : base(context)
         {
-            _context = context;
         }
         public Task DeactivateAsync(User user)
         {
@@ -24,7 +21,7 @@ namespace Infrastructure.Repositories
             return Task.CompletedTask;
         }
 
-        public async Task DeleteAsync(User user)
+        public override async Task DeleteAsync(User user)
         {
             _context.Users.Remove(user);
         }
@@ -33,7 +30,7 @@ namespace Infrastructure.Repositories
             return await _context.Users
                 .FirstOrDefaultAsync(u => u.Email == email);
         }
-        public Task UpdateAsync(User user)
+        public override Task UpdateAsync(User user)
         {
             _context.Entry(user).State = EntityState.Modified;
             return Task.CompletedTask;

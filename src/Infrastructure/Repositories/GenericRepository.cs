@@ -1,4 +1,4 @@
-﻿using Application.DTOs;
+using Application.DTOs;
 using Domain.Interfaces;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +15,7 @@ namespace Infrastructure.Repositories
     public class GenericRepository<T> :  IGenericRepository<T> where T : class 
     {
         protected readonly ClinicDbContext _context;
-        private IDbContextTransaction _currentTransaction;
+        private IDbContextTransaction? _currentTransaction;
         internal DbSet<T> dbSet;
 
         public GenericRepository(ClinicDbContext dbContext)
@@ -23,13 +23,13 @@ namespace Infrastructure.Repositories
             _context = dbContext;
             dbSet = _context.Set<T>();
         }
-        public async Task UpdateAsync(T entity)
+        public virtual async Task UpdateAsync(T entity)
         {
             dbSet.Update(entity);
             await Task.CompletedTask;
         }
 
-        public async Task DeleteAsync(T entity)
+        public virtual async Task DeleteAsync(T entity)
         {
             dbSet.Remove(entity);
             await Task.CompletedTask;
@@ -112,7 +112,7 @@ namespace Infrastructure.Repositories
         {
             await dbSet.AddAsync(entity);
         }
-        public async Task<T> GetByIdAsync(int id)
+        public async Task<T?> GetByIdAsync(int id)
         {
             return await dbSet.FindAsync(id);
         }
@@ -154,10 +154,54 @@ namespace Infrastructure.Repositories
         {
             await _context.SaveChangesAsync();
         }
+
         public async Task<IDbContextTransaction> BeginTransactionAsync()
         {
-            _currentTransaction = await _context.Database.BeginTransactionAsync();
+            var strategy = _context.Database.CreateExecutionStrategy();
+            _currentTransaction = await strategy.ExecuteAsync(async () =>
+            {
+                return await _context.Database.BeginTransactionAsync();
+            });
             return _currentTransaction;
+        }
+
+        public async Task<TResult> ExecuteInTransactionAsync<TResult>(Func<Task<TResult>> action)
+        {
+            var strategy = _context.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    var result = await action();
+                    await transaction.CommitAsync();
+                    return result;
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
+        }
+
+        public async Task ExecuteInTransactionAsync(Func<Task> action)
+        {
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                using var transaction = await _context.Database.BeginTransactionAsync();
+                try
+                {
+                    await action();
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    await transaction.RollbackAsync();
+                    throw;
+                }
+            });
         }
 
         public async Task CommitAsync()

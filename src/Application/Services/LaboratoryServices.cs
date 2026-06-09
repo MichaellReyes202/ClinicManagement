@@ -32,48 +32,48 @@ public class LaboratoryServices : ILaboratoryServices
 
     public async Task<Result> CreateExamOrderAsync(ExamOrderDto dto)
     {
-        using var transaction = await _examRepository.BeginTransactionAsync();
         try
         {
-            var appointment = await _appointmentRepository.GetByIdAsync(dto.AppointmentId);
-            if (appointment == null)
+            return await _examRepository.ExecuteInTransactionAsync(async () =>
             {
-                return Result.Failure(new Error(ErrorCodes.NotFound, "Appointment not found"));
-            }
-
-            var currentUser = await _userService.GetCurrentUserAsync();
-
-            foreach (var examTypeId in dto.ExamTypeIds)
-            {
-                var exam = new Exam
+                var appointment = await _appointmentRepository.GetByIdAsync(dto.AppointmentId);
+                if (appointment == null)
                 {
-                    AppointmentId = dto.AppointmentId,
-                    ConsultationId = dto.ConsultationId, // Can be null
-                    ExamTypeId = examTypeId,
-                    StatusId = 1, // Programado
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
-                await _examRepository.AddAsync(exam);
-            }
+                    return Result.Failure(new Error(ErrorCodes.NotFound, "Appointment not found"));
+                }
 
-            await _examRepository.SaveChangesAsync();
+                var currentUser = await _userService.GetCurrentUserAsync();
 
-            await _auditlogServices.RegisterActionAsync(
-                userId: currentUser?.Id,
-                module: AuditModuletype.System, // Or a new module for Lab
-                actionType: ActionType.CREATE,
-                recordDisplay: $"Orden de Exámenes para Cita #{dto.AppointmentId}",
-                recordId: dto.AppointmentId,
-                status: AuditStatus.SUCCESS
-            );
+                foreach (var examTypeId in dto.ExamTypeIds)
+                {
+                    var exam = new Exam
+                    {
+                        AppointmentId = dto.AppointmentId,
+                        ConsultationId = dto.ConsultationId, // Can be null
+                        ExamTypeId = examTypeId,
+                        StatusId = 1, // Programado
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    };
+                    await _examRepository.AddAsync(exam);
+                }
 
-            await transaction.CommitAsync();
-            return Result.Success();
+                await _examRepository.SaveChangesAsync();
+
+                await _auditlogServices.RegisterActionAsync(
+                    userId: currentUser?.Id,
+                    module: AuditModuletype.System, // Or a new module for Lab
+                    actionType: ActionType.CREATE,
+                    recordDisplay: $"Orden de Exámenes para Cita #{dto.AppointmentId}",
+                    recordId: dto.AppointmentId,
+                    status: AuditStatus.SUCCESS
+                );
+
+                return Result.Success();
+            });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return Result.Failure(new Error(ErrorCodes.Unexpected, $"Error creating exam order: {ex.Message}"));
         }
     }

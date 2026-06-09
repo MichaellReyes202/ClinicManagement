@@ -16,12 +16,5 @@ namespace Domain.Interfaces
         Task RemoveFromRoleAsync(User user, Role role);
         Task<bool> IsInRoleAsync(User user, string roleName);
         Task<IEnumerable<User>> GetUsersInRoleAsync(string roleName);
-
-
-        Task UpdateAsync(Role role);
-        Task DeleteAsync(Role role);
-
-        
-
     }
 }

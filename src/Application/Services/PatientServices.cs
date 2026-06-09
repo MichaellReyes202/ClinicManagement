@@ -1,4 +1,4 @@
-﻿using Application.DTOs;
+using Application.DTOs;
 using Application.DTOs.Patient;
 using Application.Interfaces;
 using AutoMapper;
@@ -169,8 +169,7 @@ public class PatientServices : IPatientServices
     }
     try
     {
-      using var transacion = await _patientRepository.BeginTransactionAsync();
-      try
+      return await _patientRepository.ExecuteInTransactionAsync(async () =>
       {
         // obtener el usuario de la sesion
         var userOnly = await _userService.GetCurrentUserAsync();
@@ -243,18 +242,13 @@ public class PatientServices : IPatientServices
           Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
         }
 
-        await transacion.CommitAsync();
-
         var patientDto = _mapper.Map<PatientResponseDto>(paciente);
         return Result<PatientResponseDto>.Success(patientDto);
-
-      }
-      catch (DbUpdateException ex)
-      {
-        await transacion.RollbackAsync();
-        return Result<PatientResponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
-      }
-
+      });
+    }
+    catch (DbUpdateException)
+    {
+      return Result<PatientResponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
     }
     catch (Exception ex)
     {
@@ -274,33 +268,31 @@ public class PatientServices : IPatientServices
 
     try
     {
-      // 2. Obtención de datos (Fuera de la transacción para no bloquear la DB innecesariamente)
-      var userOnly = await _userService.GetCurrentUserAsync();
-      var query = await _patientRepository.GetQuery(
-          filter: c => c.Id == patientId,
-          include: q => q.Include(e => e.PatientGuardian)
-      );
-      var patient = await query.FirstOrDefaultAsync();
-
-      if (patient is null)
-        return Result.Failure(new Error(ErrorCodes.NotFound, $"El paciente con ID '{patientId}' no existe."));
-
-      if (dto.Id != patientId)
-        return Result.Failure(new Error(ErrorCodes.BadRequest, "El ID de la ruta no coincide con el ID del cuerpo de la petición."));
-
-
-      var uniquenessError = await CheckUniquenessAsync(dto, patientId);
-      if (uniquenessError != null) return Result.Failure(uniquenessError);
-
-      if (!await _catalogServices.ExistSexId(dto.SexId))
-        return Result.Failure(new Error(ErrorCodes.NotFound, $"El ID de sexo: {dto.SexId} no existe.", "sexId"));
-
-      if (dto.BloodTypeId.HasValue && !await _catalogServices.ExistBloodId(dto.BloodTypeId.Value))
-        return Result.Failure(new Error(ErrorCodes.NotFound, $"El ID de tipo de sangre: {dto.BloodTypeId} no existe.", "bloodTypeId"));
-
-      using var transaction = await _patientRepository.BeginTransactionAsync();
-      try
+      return await _patientRepository.ExecuteInTransactionAsync(async () =>
       {
+        // 2. Obtención de datos dentro de la transacción
+        var userOnly = await _userService.GetCurrentUserAsync();
+        var query = await _patientRepository.GetQuery(
+            filter: c => c.Id == patientId,
+            include: q => q.Include(e => e.PatientGuardian)
+        );
+        var patient = await query.FirstOrDefaultAsync();
+
+        if (patient is null)
+          return Result.Failure(new Error(ErrorCodes.NotFound, $"El paciente con ID '{patientId}' no existe."));
+
+        if (dto.Id != patientId)
+          return Result.Failure(new Error(ErrorCodes.BadRequest, "El ID de la ruta no coincide con el ID del cuerpo de la petición."));
+
+        var uniquenessError = await CheckUniquenessAsync(dto, patientId);
+        if (uniquenessError != null) return Result.Failure(uniquenessError);
+
+        if (!await _catalogServices.ExistSexId(dto.SexId))
+          return Result.Failure(new Error(ErrorCodes.NotFound, $"El ID de sexo: {dto.SexId} no existe.", "sexId"));
+
+        if (dto.BloodTypeId.HasValue && !await _catalogServices.ExistBloodId(dto.BloodTypeId.Value))
+          return Result.Failure(new Error(ErrorCodes.NotFound, $"El ID de tipo de sangre: {dto.BloodTypeId} no existe.", "bloodTypeId"));
+
         // Mapeo general (Campos básicos)
         _mapper.Map(dto, patient);
 
@@ -318,17 +310,15 @@ public class PatientServices : IPatientServices
         await _patientRepository.UpdatePatientAsync(patient);
         await _patientRepository.SaveChangesAsync();
 
-        // Auditoría (Llamada asíncrona pero segura)
+        // Auditoría
         await RegisterPatientAudit(userOnly?.Id.ToString(), patient, ActionType.UPDATE);
 
-        await transaction.CommitAsync();
         return Result.Success();
-      }
-      catch (DbUpdateException)
-      {
-        await transaction.RollbackAsync();
-        return Result.Failure(new Error(ErrorCodes.Conflict, "Hubo un conflicto de datos únicos en la base de datos."));
-      }
+      });
+    }
+    catch (DbUpdateException)
+    {
+      return Result.Failure(new Error(ErrorCodes.Conflict, "Hubo un conflicto de datos únicos en la base de datos."));
     }
     catch (Exception ex)
     {

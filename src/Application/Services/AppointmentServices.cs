@@ -1,4 +1,4 @@
-﻿using Application.DTOs.Appointment;
+using Application.DTOs.Appointment;
 using Application.DTOs.Patient;
 using Application.Interfaces;
 using Application.Util;
@@ -118,76 +118,45 @@ public class AppointmentServices : IAppointmentServices
          .ToList();
       return Result.Failure(errors);
     }
-    using var transaction = await _appointmentRepository.BeginTransactionAsync();
-
     try
     {
-      var appointment = await _appointmentRepository.GetByIdAsync(dto.AppointmenId);
-      if (appointment is null)
+      return await _appointmentRepository.ExecuteInTransactionAsync(async () =>
       {
-        return Result.Failure(new Error(ErrorCodes.NotFound, "The appointment does not exist", "Id"));
-      }
-      var isStatusExist = await _catalogServices.ExistAppointmentStatus(dto.StatusId);
-      if (!isStatusExist)
-      {
-        return Result.Failure(new Error(ErrorCodes.NotFound, "The status id was not found", "StatusId"));
-      }
-      if (
-          (appointment.StatusId == 2 && dto.StatusId == 1) ||
-          (appointment.StatusId == 3 && new List<int> { 1, 5, 6 }.Contains(dto.StatusId)) ||
-          (appointment.StatusId == 4 && new List<int> { 1, 2, 3, 5, 6 }.Contains(dto.StatusId)) ||
-          (appointment.StatusId == 5 && new List<int> { 1, 2, 3, 4, 6 }.Contains(dto.StatusId)) ||
-          (appointment.StatusId == 6 && new List<int> { 1, 2, 3, 4, 5 }.Contains(dto.StatusId))
-      )
-      {
-        return Result.Failure(new Error(ErrorCodes.BadRequest, "The statusId exchange rate is not valid", "StatusId"));
-      }
+        var appointment = await _appointmentRepository.GetByIdAsync(dto.AppointmenId);
+        if (appointment is null)
+          return Result.Failure(new Error(ErrorCodes.NotFound, "The appointment does not exist", "Id"));
 
-      appointment.StatusId = dto.StatusId;
-      await _appointmentRepository.UpdateAsync(appointment);
-      await _appointmentRepository.SaveChangesAsync();
+        var isStatusExist = await _catalogServices.ExistAppointmentStatus(dto.StatusId);
+        if (!isStatusExist)
+          return Result.Failure(new Error(ErrorCodes.NotFound, "The status id was not found", "StatusId"));
 
-      // Registrar auditoría de cambio de estado
-      try
-      {
-        var currentUser = await _userService.GetCurrentUserAsync();
-        var statusNames = new Dictionary<int, string>
-                {
-                    {1, "Programada"}, {2, "Confirmada"}, {3, "En curso"},
-                    {4, "Completada"}, {5, "Cancelada"}, {6, "Vencida"}
-                };
-        var oldStatus = statusNames.GetValueOrDefault(appointment.StatusId, "Desconocido");
-        var newStatus = statusNames.GetValueOrDefault(dto.StatusId, "Desconocido");
-        var changeDetail = $"Estado cambiado de {oldStatus} a {newStatus}";
+        if (
+            (appointment.StatusId == 2 && dto.StatusId == 1) ||
+            (appointment.StatusId == 3 && new List<int> { 1, 5, 6 }.Contains(dto.StatusId)) ||
+            (appointment.StatusId == 4 && new List<int> { 1, 2, 3, 5, 6 }.Contains(dto.StatusId)) ||
+            (appointment.StatusId == 5 && new List<int> { 1, 2, 3, 4, 6 }.Contains(dto.StatusId)) ||
+            (appointment.StatusId == 6 && new List<int> { 1, 2, 3, 4, 5 }.Contains(dto.StatusId))
+        )
+          return Result.Failure(new Error(ErrorCodes.BadRequest, "The statusId exchange rate is not valid", "StatusId"));
 
-        await _auditlogServices.RegisterActionAsync(
-            userId: currentUser?.Id,
-            module: Domain.Enums.AuditModuletype.Appointments,
-            actionType: Domain.Enums.ActionType.STATUS_CHANGE,
-            recordDisplay: $"Cita #{appointment.Id}",
-            recordId: appointment.Id,
-            status: Domain.Enums.AuditStatus.SUCCESS,
-            changeDetail: changeDetail
-        );
-      }
-      catch (Exception auditEx)
-      {
-        Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
-      }
+        appointment.StatusId = dto.StatusId;
+        await _appointmentRepository.UpdateAsync(appointment);
+        await _appointmentRepository.SaveChangesAsync();
 
-      await transaction.CommitAsync();
-      return Result.Success();
+        try
+        {
+          var currentUser = await _userService.GetCurrentUserAsync();
+          var statusNames = new Dictionary<int, string> { {1,"Programada"},{2,"Confirmada"},{3,"En curso"},{4,"Completada"},{5,"Cancelada"},{6,"Vencida"} };
+          var changeDetail = $"Estado cambiado de {statusNames.GetValueOrDefault(appointment.StatusId, "Desconocido")} a {statusNames.GetValueOrDefault(dto.StatusId, "Desconocido")}";
+          await _auditlogServices.RegisterActionAsync(userId: currentUser?.Id, module: Domain.Enums.AuditModuletype.Appointments, actionType: Domain.Enums.ActionType.STATUS_CHANGE, recordDisplay: $"Cita #{appointment.Id}", recordId: appointment.Id, status: Domain.Enums.AuditStatus.SUCCESS, changeDetail: changeDetail);
+        }
+        catch (Exception auditEx) { Console.WriteLine($"Error registrando auditoría: {auditEx.Message}"); }
+
+        return Result.Success();
+      });
     }
-    catch (DbUpdateException)
-    {
-      await transaction.RollbackAsync();
-      return Result.Failure(new Error(ErrorCodes.Unexpected, "Error saving to database."));
-    }
-    catch (Exception)
-    {
-      await transaction.RollbackAsync();
-      return Result.Failure(new Error(ErrorCodes.Unexpected, "Unexpected error updating appointment."));
-    }
+    catch (DbUpdateException) { return Result.Failure(new Error(ErrorCodes.Unexpected, "Error saving to database.")); }
+    catch (Exception) { return Result.Failure(new Error(ErrorCodes.Unexpected, "Unexpected error updating appointment.")); }
   }
 
   public async Task<Result<List<TodayAppointmentDto>>> GetTodayAppointmentsAsync(DateTime? date = null)
@@ -492,102 +461,53 @@ public class AppointmentServices : IAppointmentServices
       return Result<int>.Failure(errors);
     }
 
-    using var transaction = await _appointmentRepository.BeginTransactionAsync();
     try
     {
-      var currentUser = await _userService.GetCurrentUserAsync();
-      var patientExists = await _patientRepository.ExistAsync(p => p.Id == dto.PatientId);
-      if (!patientExists)
+      return await _appointmentRepository.ExecuteInTransactionAsync(async () =>
       {
-        return Result<int>.Failure(new Error(ErrorCodes.NotFound, "The patient does not exist or is inactive", "PatientId"));
-      }
-      var doctorExists = await _employesRepository.ExistAsync(e => e.Id == dto.EmployeeId && e.IsActive.HasValue && e.PositionId == 1);
-      if (!doctorExists)
-      {
-        return Result<int>.Failure(new Error(ErrorCodes.NotFound, "The doctor does not exist or is inactive.", "EmployeeId"));
-      }
-      var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
-      var incomingLocalTime = DateTime.SpecifyKind(dto.StartTime, DateTimeKind.Unspecified);
+        var currentUser = await _userService.GetCurrentUserAsync();
+        var patientExists = await _patientRepository.ExistAsync(p => p.Id == dto.PatientId);
+        if (!patientExists)
+          return Result<int>.Failure(new Error(ErrorCodes.NotFound, "The patient does not exist or is inactive", "PatientId"));
 
-      var startTimeUtc = TimeZoneInfo.ConvertTimeToUtc(incomingLocalTime, userTimeZone);
-      var endTimeUtc = startTimeUtc.AddMinutes(dto.Duration);
-      var localDayStart = incomingLocalTime.Date;
-      var localDayEnd = localDayStart.AddDays(1).AddTicks(-1);
+        var doctorExists = await _employesRepository.ExistAsync(e => e.Id == dto.EmployeeId && e.IsActive.HasValue && e.PositionId == 1);
+        if (!doctorExists)
+          return Result<int>.Failure(new Error(ErrorCodes.NotFound, "The doctor does not exist or is inactive.", "EmployeeId"));
 
-      var utcRangeStart = TimeZoneInfo.ConvertTimeToUtc(localDayStart, userTimeZone);
-      var utcRangeEnd = TimeZoneInfo.ConvertTimeToUtc(localDayEnd, userTimeZone);
+        var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
+        var incomingLocalTime = DateTime.SpecifyKind(dto.StartTime, DateTimeKind.Unspecified);
+        var startTimeUtc = TimeZoneInfo.ConvertTimeToUtc(incomingLocalTime, userTimeZone);
+        var endTimeUtc = startTimeUtc.AddMinutes(dto.Duration);
 
-      var patientHasOverlap = await _appointmentRepository.ExistAsync(a =>
-          a.PatientId == dto.PatientId &&
-          a.StartTime < endTimeUtc &&
-          a.StartTime.AddMinutes(a.Duration) > startTimeUtc &&
-          a.StatusId != 5 && a.StatusId != 6 // Ignoramos canceladas/vencidas
-      );
+        var patientHasOverlap = await _appointmentRepository.ExistAsync(a =>
+            a.PatientId == dto.PatientId && a.StartTime < endTimeUtc &&
+            a.StartTime.AddMinutes(a.Duration) > startTimeUtc && a.StatusId != 5 && a.StatusId != 6);
+        if (patientHasOverlap)
+          return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "The patient already has an appointment at that time.", "StartTime"));
 
-      if (patientHasOverlap)
-      {
-        return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "The patient already has an appointment at that time.", "StartTime"));
-      }
-      var doctorHasOverlap = await _appointmentRepository.ExistAsync(a =>
-          a.EmployeeId == dto.EmployeeId &&
-          a.StartTime < endTimeUtc &&
-          a.StartTime.AddMinutes(a.Duration) > startTimeUtc &&
-          a.StatusId != 5 // Ignorar canceladas
-      );
+        var appointment = _mapper.Map<Appointment>(dto);
+        appointment.StartTime = startTimeUtc;
+        appointment.EndTime = endTimeUtc;
+        appointment.StatusId = (int)AppointmentStatus.Scheduled;
+        appointment.CreatedAt = DateTime.UtcNow;
+        appointment.CreatedByUserId = currentUser?.Id;
 
-      if (doctorHasOverlap)
-      {
-        // Relaxed for testing/immediate consultation: Log warning but allow
-        // return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "The doctor already has an appointment at that time.", "StartTime"));
-      }
+        await _appointmentRepository.AddAsync(appointment);
+        await _appointmentRepository.SaveChangesAsync();
 
-      var appointment = _mapper.Map<Appointment>(dto);
-      appointment.StartTime = startTimeUtc;
-      appointment.EndTime = endTimeUtc;
+        try
+        {
+          var patient = await _patientRepository.GetByIdAsync(dto.PatientId);
+          var doctor = await _employesRepository.GetByIdAsync(dto.EmployeeId);
+          await _auditlogServices.RegisterActionAsync(userId: currentUser?.Id, module: AuditModuletype.Appointments, actionType: Domain.Enums.ActionType.CREATE, recordDisplay: $"Cita para {(patient != null ? $"{patient.FirstName} {patient.LastName}".Trim() : "Paciente desconocido")} con {(doctor != null ? $"{doctor.FirstName} {doctor.LastName}".Trim() : "Doctor desconocido")}", recordId: appointment.Id, status: AuditStatus.SUCCESS);
+        }
+        catch (Exception auditEx) { Console.WriteLine($"Error registrando auditoría: {auditEx.Message}"); }
 
-      appointment.StatusId = (int)AppointmentStatus.Scheduled;
-      appointment.CreatedAt = DateTime.UtcNow;
-      appointment.CreatedByUserId = currentUser?.Id;
-
-      await _appointmentRepository.AddAsync(appointment);
-      await _appointmentRepository.SaveChangesAsync();
-
-      // Registrar auditoría
-      try
-      {
-        var patient = await _patientRepository.GetByIdAsync(dto.PatientId);
-        var doctor = await _employesRepository.GetByIdAsync(dto.EmployeeId);
-        var patientName = patient != null ? $"{patient.FirstName} {patient.LastName}".Trim() : "Paciente desconocido";
-        var doctorName = doctor != null ? $"{doctor.FirstName} {doctor.LastName}".Trim() : "Doctor desconocido";
-
-        await _auditlogServices.RegisterActionAsync(
-            userId: currentUser?.Id,
-            module: AuditModuletype.Appointments,
-            actionType: Domain.Enums.ActionType.CREATE,
-            recordDisplay: $"Cita para {patientName} con {doctorName}",
-            recordId: appointment.Id,
-            status: AuditStatus.SUCCESS
-        );
-      }
-      catch (Exception auditEx)
-      {
-        Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
-      }
-
-      await transaction.CommitAsync();
-
-      return Result<int>.Success(appointment.Id);
+        return Result<int>.Success(appointment.Id);
+      });
     }
-    catch (DbUpdateException)
-    {
-      await transaction.RollbackAsync();
-      return Result<int>.Failure(new Error(ErrorCodes.Unexpected, "Error saving to database."));
-    }
-    catch (Exception)
-    {
-      await transaction.RollbackAsync();
-      return Result<int>.Failure(new Error(ErrorCodes.Unexpected, "Unexpected error creating appointment."));
-    }
+    catch (DbUpdateException) { return Result<int>.Failure(new Error(ErrorCodes.Unexpected, "Error saving to database.")); }
+    catch (Exception) { return Result<int>.Failure(new Error(ErrorCodes.Unexpected, "Unexpected error creating appointment.")); }
   }
   public async Task<Result> Update(AppointmentUpdateDto dto, int patientId)
   {
@@ -600,129 +520,80 @@ public class AppointmentServices : IAppointmentServices
       return Result.Failure(errors);
     }
 
-    using var transaction = await _appointmentRepository.BeginTransactionAsync();
     try
     {
-      var currentUser = await _userService.GetCurrentUserAsync();
-      var appointment = await _appointmentRepository.GetByIdAsync(dto.Id);
-      if (appointment is null)
+      return await _appointmentRepository.ExecuteInTransactionAsync(async () =>
       {
-        return Result.Failure(new Error(ErrorCodes.NotFound, "The appointment does not exist", "Id"));
-      }
-      var patientExists = await _patientRepository.ExistAsync(p => p.Id == dto.PatientId);
-      if (!patientExists)
-      {
-        return Result.Failure(new Error(ErrorCodes.NotFound, "The patient does not exist or is inactive", "PatientId"));
-      }
-      var doctorExists = await _employesRepository.ExistAsync(e => e.Id == dto.EmployeeId && e.IsActive.HasValue && e.PositionId == 1);
-      if (!doctorExists)
-      {
-        return Result.Failure(new Error(ErrorCodes.NotFound, "The doctor does not exist or is inactive.", "EmployeeId"));
-      }
+        var currentUser = await _userService.GetCurrentUserAsync();
+        var appointment = await _appointmentRepository.GetByIdAsync(dto.Id);
+        if (appointment is null) return Result.Failure(new Error(ErrorCodes.NotFound, "The appointment does not exist", "Id"));
 
-      var existStatusId = await _catalogServices.ExistAppointmentStatus(dto.StatusId);
-      if (!existStatusId)
-      {
-        return Result.Failure(new Error(ErrorCodes.NotFound, $"The code for the appointment status {dto.StatusId} was not found", "StatusId"));
-      }
-      var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
+        var patientExists = await _patientRepository.ExistAsync(p => p.Id == dto.PatientId);
+        if (!patientExists) return Result.Failure(new Error(ErrorCodes.NotFound, "The patient does not exist or is inactive", "PatientId"));
 
-      var incomingLocalTime = DateTime.SpecifyKind(dto.StartTime, DateTimeKind.Unspecified);
-      var startTimeUtc = TimeZoneInfo.ConvertTimeToUtc(incomingLocalTime, userTimeZone);
-      var endTimeUtc = startTimeUtc.AddMinutes(dto.Duration);
-      var doctorHasOverlap = await _appointmentRepository.ExistAsync(a =>
-          a.EmployeeId == dto.EmployeeId &&
-          a.StartTime < endTimeUtc &&
-          a.StartTime.AddMinutes(a.Duration) > startTimeUtc &&
-          a.Id != dto.Id &&
-          a.StatusId != 5 // Ignorar canceladas
-      );
+        var doctorExists = await _employesRepository.ExistAsync(e => e.Id == dto.EmployeeId && e.IsActive.HasValue && e.PositionId == 1);
+        if (!doctorExists) return Result.Failure(new Error(ErrorCodes.NotFound, "The doctor does not exist or is inactive.", "EmployeeId"));
 
-      if (doctorHasOverlap)
-      {
-        return Result.Failure(new Error(ErrorCodes.BadRequest, "The doctor already has an appointment at that time.", "StartTime"));
-      }
+        var existStatusId = await _catalogServices.ExistAppointmentStatus(dto.StatusId);
+        if (!existStatusId) return Result.Failure(new Error(ErrorCodes.NotFound, $"The code for the appointment status {dto.StatusId} was not found", "StatusId"));
 
-      // 6. Mapear y Actualizar
-      _mapper.Map(dto, appointment);
-      appointment.StartTime = startTimeUtc;
-      appointment.EndTime = endTimeUtc;
+        var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
+        var incomingLocalTime = DateTime.SpecifyKind(dto.StartTime, DateTimeKind.Unspecified);
+        var startTimeUtc = TimeZoneInfo.ConvertTimeToUtc(incomingLocalTime, userTimeZone);
+        var endTimeUtc = startTimeUtc.AddMinutes(dto.Duration);
 
-      appointment.StatusId = dto.StatusId;
-      appointment.UpdatedAt = DateTime.UtcNow;
-      appointment.UpdatedByUserId = currentUser?.Id;
+        var doctorHasOverlap = await _appointmentRepository.ExistAsync(a =>
+            a.EmployeeId == dto.EmployeeId && a.StartTime < endTimeUtc &&
+            a.StartTime.AddMinutes(a.Duration) > startTimeUtc && a.Id != dto.Id && a.StatusId != 5);
+        if (doctorHasOverlap)
+          return Result.Failure(new Error(ErrorCodes.BadRequest, "The doctor already has an appointment at that time.", "StartTime"));
 
-      await _appointmentRepository.UpdateAsync(appointment);
-      await _appointmentRepository.SaveChangesAsync();
+        _mapper.Map(dto, appointment);
+        appointment.StartTime = startTimeUtc;
+        appointment.EndTime = endTimeUtc;
+        appointment.StatusId = dto.StatusId;
+        appointment.UpdatedAt = DateTime.UtcNow;
+        appointment.UpdatedByUserId = currentUser?.Id;
 
-      // Registrar auditoría
-      try
-      {
-        var patient = await _patientRepository.GetByIdAsync(dto.PatientId);
-        var doctor = await _employesRepository.GetByIdAsync(dto.EmployeeId);
-        var patientName = patient != null ? $"{patient.FirstName} {patient.LastName}".Trim() : "Paciente desconocido";
-        var doctorName = doctor != null ? $"{doctor.FirstName} {doctor.LastName}".Trim() : "Doctor desconocido";
+        await _appointmentRepository.UpdateAsync(appointment);
+        await _appointmentRepository.SaveChangesAsync();
 
-        await _auditlogServices.RegisterActionAsync(
-            userId: currentUser?.Id,
-            module: Domain.Enums.AuditModuletype.Appointments,
-            actionType: Domain.Enums.ActionType.UPDATE,
-            recordDisplay: $"Cita para {patientName} con {doctorName}",
-            recordId: appointment.Id,
-            status: Domain.Enums.AuditStatus.SUCCESS
-        );
-      }
-      catch (Exception auditEx)
-      {
-        Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
-      }
+        try
+        {
+          var patient = await _patientRepository.GetByIdAsync(dto.PatientId);
+          var doctor = await _employesRepository.GetByIdAsync(dto.EmployeeId);
+          await _auditlogServices.RegisterActionAsync(userId: currentUser?.Id, module: Domain.Enums.AuditModuletype.Appointments, actionType: Domain.Enums.ActionType.UPDATE, recordDisplay: $"Cita para {(patient != null ? $"{patient.FirstName} {patient.LastName}".Trim() : "Paciente desconocido")} con {(doctor != null ? $"{doctor.FirstName} {doctor.LastName}".Trim() : "Doctor desconocido")}", recordId: appointment.Id, status: Domain.Enums.AuditStatus.SUCCESS);
+        }
+        catch (Exception auditEx) { Console.WriteLine($"Error registrando auditoría: {auditEx.Message}"); }
 
-      await transaction.CommitAsync();
-
-      return Result.Success();
+        return Result.Success();
+      });
     }
-    catch (DbUpdateException)
-    {
-      await transaction.RollbackAsync();
-      return Result.Failure(new Error(ErrorCodes.Unexpected, "Error saving to database."));
-    }
-    catch (Exception)
-    {
-      await transaction.RollbackAsync();
-      return Result.Failure(new Error(ErrorCodes.Unexpected, "Unexpected error updating appointment."));
-    }
+    catch (DbUpdateException) { return Result.Failure(new Error(ErrorCodes.Unexpected, "Error saving to database.")); }
+    catch (Exception) { return Result.Failure(new Error(ErrorCodes.Unexpected, "Unexpected error updating appointment.")); }
   }
 
   public async Task<Result> Delete(int id)
   {
-    using var transaction = await _appointmentRepository.BeginTransactionAsync();
     try
     {
-      var appointment = await _appointmentRepository.GetByIdAsync(id);
-      if (appointment == null)
+      return await _appointmentRepository.ExecuteInTransactionAsync(async () =>
       {
-        return Result.Failure(new Error(ErrorCodes.NotFound, "Appointment not found"));
-      }
+        var appointment = await _appointmentRepository.GetByIdAsync(id);
+        if (appointment == null)
+          return Result.Failure(new Error(ErrorCodes.NotFound, "Appointment not found"));
 
-      await _appointmentRepository.DeleteAsync(appointment);
-      await _appointmentRepository.SaveChangesAsync();
+        await _appointmentRepository.DeleteAsync(appointment);
+        await _appointmentRepository.SaveChangesAsync();
 
-      var currentUser = await _userService.GetCurrentUserAsync();
-      await _auditlogServices.RegisterActionAsync(
-          userId: currentUser?.Id,
-          module: Domain.Enums.AuditModuletype.Appointments,
-          actionType: Domain.Enums.ActionType.DELETE,
-          recordDisplay: $"Cita #{id} eliminada",
-          recordId: id,
-          status: Domain.Enums.AuditStatus.SUCCESS
-      );
+        var currentUser = await _userService.GetCurrentUserAsync();
+        await _auditlogServices.RegisterActionAsync(userId: currentUser?.Id, module: Domain.Enums.AuditModuletype.Appointments, actionType: Domain.Enums.ActionType.DELETE, recordDisplay: $"Cita #{id} eliminada", recordId: id, status: Domain.Enums.AuditStatus.SUCCESS);
 
-      await transaction.CommitAsync();
-      return Result.Success();
+        return Result.Success();
+      });
     }
     catch (Exception ex)
     {
-      await transaction.RollbackAsync();
       return Result.Failure(new Error(ErrorCodes.Unexpected, $"Error deleting appointment: {ex.Message}"));
     }
   }

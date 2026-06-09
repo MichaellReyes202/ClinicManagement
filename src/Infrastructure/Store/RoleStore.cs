@@ -50,10 +50,10 @@ namespace Infrastructure.Store
             return Task.FromResult(role.Id.ToString());
         }
 
-        public Task<string?> GetRoleNameAsync(Role role, CancellationToken cancellationToken)
+        public Task<string> GetRoleNameAsync(Role role, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(role.Name);
+            return Task.FromResult(role.Name ?? string.Empty);
         }
 
         public Task SetRoleNameAsync(Role role, string? roleName, CancellationToken cancellationToken)
@@ -63,10 +63,10 @@ namespace Infrastructure.Store
             return Task.CompletedTask;
         }
 
-        public Task<string?> GetNormalizedRoleNameAsync(Role role, CancellationToken cancellationToken)
+        public Task<string> GetNormalizedRoleNameAsync(Role role, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(role.Name);
+            return Task.FromResult(role.Name ?? string.Empty);
         }
 
         public Task SetNormalizedRoleNameAsync(Role role, string? normalizedName, CancellationToken cancellationToken)

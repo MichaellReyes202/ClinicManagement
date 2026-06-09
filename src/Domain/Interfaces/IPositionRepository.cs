@@ -9,6 +9,5 @@ namespace Domain.Interfaces
 {
     public interface IPositionRepository : IGenericRepository<Position>
     {
-        Task UpdateAsync(Position position);
     }
 }

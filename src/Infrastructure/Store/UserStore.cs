@@ -61,9 +61,9 @@ namespace Infrastructure.Store
         {
             cancellationToken.ThrowIfCancellationRequested();
             var email = await _userRepository.FindByIdAsync(user.Id.ToString());
-            return email?.NormalizedEmail.ToUpper();
+            return email?.NormalizedEmail?.ToUpper();
         }
-        public async Task<string> GetUserIdAsync(User user, CancellationToken cancellationToken)
+        public Task<string?> GetUserIdAsync(User user, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -72,7 +72,7 @@ namespace Infrastructure.Store
                 throw new ArgumentNullException(nameof(user));
             }
 
-            return await Task.FromResult(user.Id.ToString());
+            return Task.FromResult<string?>(user.Id.ToString());
         }
 
         public Task SetUserNameAsync(User user, string? userName, CancellationToken cancellationToken)
@@ -98,7 +98,7 @@ namespace Infrastructure.Store
             await _userRepository.SaveChangesAsync();
             return IdentityResult.Success;
         }
-        public Task<string?> GetUserNameAsync(User user, CancellationToken cancellationToken)
+        public Task<string> GetUserNameAsync(User user, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (user == null)
@@ -106,7 +106,7 @@ namespace Infrastructure.Store
                 throw new ArgumentNullException(nameof(user));
             }
             // Asigna el nombre de usuario. Para tu caso, el email es el nombre de usuario.
-            return Task.FromResult(user.Email);
+            return Task.FromResult(user.Email ?? string.Empty);
         }
 
 
@@ -138,7 +138,7 @@ namespace Infrastructure.Store
             throw new NotImplementedException();
 
         }
-        public Task<string?> GetNormalizedEmailAsync(User user, CancellationToken cancellationToken)
+        public Task<string> GetNormalizedEmailAsync(User user, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -147,10 +147,9 @@ namespace Infrastructure.Store
                 throw new ArgumentNullException(nameof(user));
             }
 
-            // Retorna el email normalizado. Si el email es nulo, retorna nulo.
-            return Task.FromResult(_normalizer.NormalizeEmail(user.Email));
-        }
-        public Task SetEmailAsync(User user, string? email, CancellationToken cancellationToken)
+            // Retorna el email normalizado. Si el email es nulo, retorna cadena vacía.
+            return Task.FromResult(_normalizer.NormalizeEmail(user.Email) ?? string.Empty);
+        }        public Task SetEmailAsync(User user, string? email, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -201,7 +200,7 @@ namespace Infrastructure.Store
             }
 
             // Retorna el hash de la contraseña de la entidad.
-            return Task.FromResult(user.PasswordHash);
+            return Task.FromResult<string?>(user.PasswordHash);
         }
         public Task<bool> HasPasswordAsync(User user, CancellationToken cancellationToken)
         {

@@ -5,8 +5,6 @@ namespace Domain.Interfaces
 {
     public interface IUserRepository : IGenericRepository<User>
     {
-        Task UpdateAsync(User user);
-        Task DeleteAsync(User user);
         Task DeactivateAsync(User user);
 
 

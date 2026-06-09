@@ -1,4 +1,4 @@
-﻿using Application.DTOs;
+using Application.DTOs;
 using Application.DTOs.Role;
 using Application.Interfaces;
 using AutoMapper;
@@ -119,10 +119,8 @@ namespace Application.Services
             }
             try
             {
-                await _roleRepository.BeginTransactionAsync();
-                try
+                return await _roleRepository.ExecuteInTransactionAsync(async () =>
                 {
-                    
                     var existingRole = await _roleRepository.FindByNameAsync(roleCreaction.Name);
                     if (existingRole != null)
                     {
@@ -131,7 +129,6 @@ namespace Application.Services
                     var role = _mapper.Map<Role>(roleCreaction);
 
                     var result = await _roleManager.CreateAsync(role);
-                    await _roleRepository.CommitAsync();
                     if (!result.Succeeded)
                     {
                         var errors = result.Errors
@@ -141,15 +138,14 @@ namespace Application.Services
                     }
 
                     return Result<Role>.Success(role);
-                }
-                catch (DbUpdateException dbEx)
-                {
-                    return Result<Role>.Failure(new Error(ErrorCodes.Unexpected, $"Database error: {dbEx.Message}"));
-                }
+                });
+            }
+            catch (DbUpdateException dbEx)
+            {
+                return Result<Role>.Failure(new Error(ErrorCodes.Unexpected, $"Database error: {dbEx.Message}"));
             }
             catch (Exception ex)
             {
-                await _roleRepository.RollbackAsync();
                 return Result<Role>.Failure(new Error(ErrorCodes.Unexpected, $"An unexpected error occurred: {ex.Message}"));
             }            
         }

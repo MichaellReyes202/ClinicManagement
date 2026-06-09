@@ -29,166 +29,165 @@ public class ConsultationServices : IConsultationServices
 
     public async Task<Result<int>> StartConsultationAsync(int appointmentId)
     {
-        using var transaction = await _consultationRepository.BeginTransactionAsync();
         try
         {
-            var appointment = await _appointmentRepository.GetByIdAsync(appointmentId);
-            if (appointment == null)
+            return await _consultationRepository.ExecuteInTransactionAsync(async () =>
             {
-                return Result<int>.Failure(new Error(ErrorCodes.NotFound, "Appointment not found"));
-            }
+                var appointment = await _appointmentRepository.GetByIdAsync(appointmentId);
+                if (appointment == null)
+                {
+                    return Result<int>.Failure(new Error(ErrorCodes.NotFound, "Appointment not found"));
+                }
 
-            if (appointment.StatusId != 2) // Must be Confirmed
-            {
-                return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "Appointment is not in 'Confirmed' status"));
-            }
+                if (appointment.StatusId != 2) // Must be Confirmed
+                {
+                    return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "Appointment is not in 'Confirmed' status"));
+                }
 
-            // Check if consultation already exists
-            var existingConsultation = await _consultationRepository.GetQuery(c => c.AppointmentId == appointmentId);
-            if (await existingConsultation.AnyAsync())
-            {
-                return Result<int>.Failure(new Error(ErrorCodes.Conflict, "Consultation already exists for this appointment"));
-            }
+                // Check if consultation already exists
+                var existingConsultation = await _consultationRepository.GetQuery(c => c.AppointmentId == appointmentId);
+                if (await existingConsultation.AnyAsync())
+                {
+                    return Result<int>.Failure(new Error(ErrorCodes.Conflict, "Consultation already exists for this appointment"));
+                }
 
-            var currentUser = await _userService.GetCurrentUserAsync();
+                var currentUser = await _userService.GetCurrentUserAsync();
 
-            var consultation = new Consultation
-            {
-                AppointmentId = appointmentId,
-                PatientId = appointment.PatientId ?? 0, // Should verify nullability
-                EmployeeId = appointment.EmployeeId ?? 0,
-                CreatedAt = DateTime.UtcNow,
-                CreatedByUserId = currentUser?.Id,
-                IsFinalized = false
-            };
+                var consultation = new Consultation
+                {
+                    AppointmentId = appointmentId,
+                    PatientId = appointment.PatientId ?? 0, // Should verify nullability
+                    EmployeeId = appointment.EmployeeId ?? 0,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedByUserId = currentUser?.Id,
+                    IsFinalized = false
+                };
 
-            await _consultationRepository.AddAsync(consultation);
-            await _consultationRepository.SaveChangesAsync();
+                await _consultationRepository.AddAsync(consultation);
+                await _consultationRepository.SaveChangesAsync();
 
-            // Update Appointment Status to 3 (En Curso)
-            appointment.StatusId = 3;
-            await _appointmentRepository.UpdateAsync(appointment);
-            await _appointmentRepository.SaveChangesAsync();
+                // Update Appointment Status to 3 (En Curso)
+                appointment.StatusId = 3;
+                await _appointmentRepository.UpdateAsync(appointment);
+                await _appointmentRepository.SaveChangesAsync();
 
-            await _auditlogServices.RegisterActionAsync(
-                userId: currentUser?.Id,
-                module: AuditModuletype.Appointments,
-                actionType: ActionType.STATUS_CHANGE,
-                recordDisplay: $"Consulta iniciada para Cita #{appointmentId}",
-                recordId: consultation.Id,
-                status: AuditStatus.SUCCESS
-            );
+                await _auditlogServices.RegisterActionAsync(
+                    userId: currentUser?.Id,
+                    module: AuditModuletype.Appointments,
+                    actionType: ActionType.STATUS_CHANGE,
+                    recordDisplay: $"Consulta iniciada para Cita #{appointmentId}",
+                    recordId: consultation.Id,
+                    status: AuditStatus.SUCCESS
+                );
 
-            await transaction.CommitAsync();
-
-            return Result<int>.Success(consultation.Id);
+                return Result<int>.Success(consultation.Id);
+            });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return Result<int>.Failure(new Error(ErrorCodes.Unexpected, $"Error starting consultation: {ex.Message}"));
         }
     }
 
     public async Task<Result> FinishConsultationAsync(FinishConsultationDto dto)
     {
-        using var transaction = await _consultationRepository.BeginTransactionAsync();
         try
         {
-            var consultation = await _consultationRepository.GetByIdAsync(dto.ConsultationId);
-            if (consultation == null)
+            return await _consultationRepository.ExecuteInTransactionAsync(async () =>
             {
-                return Result.Failure(new Error(ErrorCodes.NotFound, "Consultation not found"));
-            }
-
-            if (consultation.IsFinalized == true)
-            {
-                return Result.Failure(new Error(ErrorCodes.BadRequest, "Consultation is already finalized"));
-            }
-
-            var currentUser = await _userService.GetCurrentUserAsync();
-
-            consultation.Reason = dto.Reason;
-            consultation.PhysicalExam = dto.PhysicalExam;
-            consultation.Diagnosis = dto.Diagnosis;
-            consultation.TreatmentNotes = dto.TreatmentNotes;
-            consultation.IsFinalized = true;
-            consultation.FinalizedAt = DateTime.UtcNow;
-            consultation.UpdatedAt = DateTime.UtcNow;
-            consultation.UpdatedByUserId = currentUser?.Id;
-
-            await _consultationRepository.UpdateAsync(consultation);
-            await _consultationRepository.SaveChangesAsync();
-
-            // Update Appointment Status to 4 (Completed)
-            if (consultation.AppointmentId.HasValue)
-            {
-                var appointment = await _appointmentRepository.GetByIdAsync(consultation.AppointmentId.Value);
-                if (appointment != null)
+                var consultation = await _consultationRepository.GetByIdAsync(dto.ConsultationId);
+                if (consultation == null)
                 {
-                    appointment.StatusId = 4;
-                    await _appointmentRepository.UpdateAsync(appointment);
-                    await _appointmentRepository.SaveChangesAsync();
+                    return Result.Failure(new Error(ErrorCodes.NotFound, "Consultation not found"));
                 }
-            }
 
-             await _auditlogServices.RegisterActionAsync(
-                userId: currentUser?.Id,
-                module: AuditModuletype.Appointments,
-                actionType: ActionType.STATUS_CHANGE,
-                recordDisplay: $"Consulta finalizada #{consultation.Id}",
-                recordId: consultation.Id,
-                status: AuditStatus.SUCCESS
-            );
+                if (consultation.IsFinalized == true)
+                {
+                    return Result.Failure(new Error(ErrorCodes.BadRequest, "Consultation is already finalized"));
+                }
 
-            await transaction.CommitAsync();
-            return Result.Success();
+                var currentUser = await _userService.GetCurrentUserAsync();
+
+                consultation.Reason = dto.Reason;
+                consultation.PhysicalExam = dto.PhysicalExam;
+                consultation.Diagnosis = dto.Diagnosis;
+                consultation.TreatmentNotes = dto.TreatmentNotes;
+                consultation.IsFinalized = true;
+                consultation.FinalizedAt = DateTime.UtcNow;
+                consultation.UpdatedAt = DateTime.UtcNow;
+                consultation.UpdatedByUserId = currentUser?.Id;
+
+                await _consultationRepository.UpdateAsync(consultation);
+                await _consultationRepository.SaveChangesAsync();
+
+                // Update Appointment Status to 4 (Completed)
+                if (consultation.AppointmentId.HasValue)
+                {
+                    var appointment = await _appointmentRepository.GetByIdAsync(consultation.AppointmentId.Value);
+                    if (appointment != null)
+                    {
+                        appointment.StatusId = 4;
+                        await _appointmentRepository.UpdateAsync(appointment);
+                        await _appointmentRepository.SaveChangesAsync();
+                    }
+                }
+
+                await _auditlogServices.RegisterActionAsync(
+                    userId: currentUser?.Id,
+                    module: AuditModuletype.Appointments,
+                    actionType: ActionType.STATUS_CHANGE,
+                    recordDisplay: $"Consulta finalizada #{consultation.Id}",
+                    recordId: consultation.Id,
+                    status: AuditStatus.SUCCESS
+                );
+
+                return Result.Success();
+            });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return Result.Failure(new Error(ErrorCodes.Unexpected, $"Error finishing consultation: {ex.Message}"));
         }
     }
 
     public async Task<Result> RollbackConsultationAsync(int consultationId)
     {
-        using var transaction = await _consultationRepository.BeginTransactionAsync();
         try
         {
-            var consultation = await _consultationRepository.GetByIdAsync(consultationId);
-            if (consultation == null)
+            return await _consultationRepository.ExecuteInTransactionAsync(async () =>
             {
-                return Result.Failure(new Error(ErrorCodes.NotFound, "Consultation not found"));
-            }
-
-            if (consultation.IsFinalized == true)
-            {
-                return Result.Failure(new Error(ErrorCodes.BadRequest, "Cannot rollback a finalized consultation"));
-            }
-
-            // Revert Appointment Status to 2 (Confirmed)
-            if (consultation.AppointmentId.HasValue)
-            {
-                var appointment = await _appointmentRepository.GetByIdAsync(consultation.AppointmentId.Value);
-                if (appointment != null)
+                var consultation = await _consultationRepository.GetByIdAsync(consultationId);
+                if (consultation == null)
                 {
-                    appointment.StatusId = 2;
-                    await _appointmentRepository.UpdateAsync(appointment);
-                    await _appointmentRepository.SaveChangesAsync();
+                    return Result.Failure(new Error(ErrorCodes.NotFound, "Consultation not found"));
                 }
-            }
 
-            // Delete Consultation
-            await _consultationRepository.DeleteAsync(consultation);
-            await _consultationRepository.SaveChangesAsync();
+                if (consultation.IsFinalized == true)
+                {
+                    return Result.Failure(new Error(ErrorCodes.BadRequest, "Cannot rollback a finalized consultation"));
+                }
 
-            await transaction.CommitAsync();
-            return Result.Success();
+                // Revert Appointment Status to 2 (Confirmed)
+                if (consultation.AppointmentId.HasValue)
+                {
+                    var appointment = await _appointmentRepository.GetByIdAsync(consultation.AppointmentId.Value);
+                    if (appointment != null)
+                    {
+                        appointment.StatusId = 2;
+                        await _appointmentRepository.UpdateAsync(appointment);
+                        await _appointmentRepository.SaveChangesAsync();
+                    }
+                }
+
+                // Delete Consultation
+                await _consultationRepository.DeleteAsync(consultation);
+                await _consultationRepository.SaveChangesAsync();
+
+                return Result.Success();
+            });
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
             return Result.Failure(new Error(ErrorCodes.Unexpected, $"Error rolling back consultation: {ex.Message}"));
         }
     }

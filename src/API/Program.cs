@@ -42,10 +42,16 @@ builder.Services.AddControllers(options =>
 });
 
 // Configurar DbContext con PostgreSQL
+var defaultConnection = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrEmpty(defaultConnection))
+{
+    throw new InvalidOperationException("Connection string 'DefaultConnection' is not configured.");
+}
+
 builder.Services.AddDbContext<ClinicDbContext>(options =>
 {
   options.UseNpgsql(
-    builder.Configuration.GetConnectionString("DefaultConnection"),
+    defaultConnection,
     npgsqlOptions =>
     {
       // Reintentos automáticos ante fallos transitorios (cold-start de Neon.tech)
@@ -66,12 +72,12 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
   {
     // 1. Extraemos los errores automáticos de .NET
     var errors = context.ModelState
-          .Where(e => e.Value.Errors.Count > 0)
-          .SelectMany(kvp => kvp.Value.Errors.Select(e => new ValidationError(
-              propertyName: kvp.Key,
-              errorMessage: e.ErrorMessage
-          )))
-          .ToList();
+        .Where(e => e.Value != null && e.Value.Errors.Count > 0)
+        .SelectMany(kvp => kvp.Value!.Errors.Select(e => new ValidationError(
+          propertyName: kvp.Key,
+          errorMessage: e.ErrorMessage
+        )))
+        .ToList();
 
     // 2. Armamos nuestro objeto estándar
     var standardError = new Error(
@@ -190,7 +196,8 @@ builder.Services.AddHttpContextAccessor();
 
 
 // Registro del servicio de automapper
-builder.Services.AddAutoMapper(typeof(AutoMapperProfiles));
+// Registrar AutoMapper: en v14 escanear ensamblados en vez de pasar un Type
+builder.Services.AddAutoMapper(cfg => { }, AppDomain.CurrentDomain.GetAssemblies());
 
 // Registrar validadores de FluentValidation
 builder.Services.AddFluentValidationAutoValidation();
@@ -222,7 +229,12 @@ builder.Services.AddIdentity<User, Role>(options =>
 
 // Configuracion de la autenticacion con JWT
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
-var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
+var jwtKey = jwtSettings["Key"];
+if (string.IsNullOrEmpty(jwtKey))
+{
+  throw new InvalidOperationException("JWT signing key is not configured in JwtSettings:Key.");
+}
+var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
 builder.Services
     .AddAuthentication(options =>

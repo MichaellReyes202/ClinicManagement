@@ -6,11 +6,8 @@ namespace Infrastructure.Repositories
 {
     public class RoleRepository : GenericRepository<Role> ,  IRoleRepository
     {
-        private readonly ClinicDbContext _context;
-
         public RoleRepository(ClinicDbContext context) : base(context)
         {
-            _context = context;
         }
         public async Task<Role?> FindByNameAsync(string roleName)
         {
@@ -86,12 +83,12 @@ namespace Infrastructure.Repositories
 
 
 
-        public async Task UpdateAsync(Role role)
+        public override async Task UpdateAsync(Role role)
         {
             _context.Entry(role).State = EntityState.Modified;
         }
 
-        public async Task DeleteAsync(Role role)
+        public override async Task DeleteAsync(Role role)
         {
             _context.Roles.Remove(role);
         }

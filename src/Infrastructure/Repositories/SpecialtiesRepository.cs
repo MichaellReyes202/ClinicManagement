@@ -7,18 +7,15 @@ namespace Infrastructure.Repositories
 {
     public class SpecialtiesRepository : GenericRepository<Specialty> , ISpecialtiesRepository
     {
-        private readonly ClinicDbContext _context;
-
         public SpecialtiesRepository(ClinicDbContext context) : base(context)
         {
-            _context = context;
         }
         public async Task<Specialty?> GetByNameAsync(string name)
         {
             return await _context.Specialties.FirstOrDefaultAsync(s => s.Name == name);
         }
 
-        public async Task UpdateAsync(Specialty specialty)
+        public override async Task UpdateAsync(Specialty specialty)
         {
             _context.Entry(specialty).State = EntityState.Modified;
             await SaveChangesAsync();

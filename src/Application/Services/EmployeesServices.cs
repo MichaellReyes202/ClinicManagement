@@ -156,8 +156,7 @@ public class EmployesServices : IEmployesServices
         }
         try
         {
-            using var transacion = await _employeesRepository.BeginTransactionAsync();
-            try
+            return await _employeesRepository.ExecuteInTransactionAsync(async () =>
             {
                 var userOnly = await _userService.GetCurrentUserAsync();
 
@@ -168,12 +167,7 @@ public class EmployesServices : IEmployesServices
 
                 var existingDni = await _employeesRepository.ExistAsync(c => c.Dni == employes.Dni!.ToUpper());
                 if (existingDni)
-                    // Usamos el constructor con campo para el error 409
                     return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"The ID number '{employes.Dni}' It already exists.", "dni"));
-
-                // TODO : Falta validar que la edad concuerde con la del dni
-
-
 
                 // Verificar que la especialidad existe ( si es que se mando una )
                 if (employes.SpecialtyId.HasValue)
@@ -185,7 +179,6 @@ public class EmployesServices : IEmployesServices
                 var positionExists = await _positionRepository.GetByIdAsync(employes.PositionId) != null;
                 if (!positionExists)
                     return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.NotFound, $"The position with ID '{employes.PositionId}' does not exist."));
-
 
                 // creacion de un nuevo usuario 
                 var employee = _mapper.Map<Employee>(employes);
@@ -225,18 +218,13 @@ public class EmployesServices : IEmployesServices
                     Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
                 }
 
-                await transacion.CommitAsync();
-
                 var employeeDto = _mapper.Map<EmployeReponseDto>(employee);
                 return Result<EmployeReponseDto>.Success(employeeDto);
-
-            }
-            catch (DbUpdateException ex)
-            {
-                await transacion.RollbackAsync();
-                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
-            }
-
+            });
+        }
+        catch (DbUpdateException)
+        {
+            return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, "A unique data conflict has occurred. Please try again."));
         }
         catch (Exception ex)
         {
@@ -258,8 +246,7 @@ public class EmployesServices : IEmployesServices
         }
         try
         {
-            using var transacion = await _employeesRepository.BeginTransactionAsync();
-            try
+            return await _employeesRepository.ExecuteInTransactionAsync(async () =>
             {
                 var userOnly = await _userService.GetCurrentUserAsync();
 
@@ -281,10 +268,6 @@ public class EmployesServices : IEmployesServices
                 if (verifyDni)
                     return Result.Failure(new Error(ErrorCodes.Conflict, "The ID number provided is already in use by another employee.", "dni"));
 
-
-                // TODO : Falta validar que la edad concuerde con la cedula y formato del dni 
-
-
                 // Verificar que la especialidad existe ( si es que se mando una )
                 if (dto.SpecialtyId.HasValue)
                 {
@@ -295,8 +278,6 @@ public class EmployesServices : IEmployesServices
                 var positionExists = await _positionRepository.GetByIdAsync(dto.PositionId) != null;
                 if (!positionExists)
                     return Result.Failure(new Error(ErrorCodes.NotFound, $"The position with ID '{dto.PositionId}' does not exist."));
-
-
 
                 // Verificar si deshabilito el empleado , se tiene que deshabilitar el usuario ( si es que lo esta)
                 if (employe.UserId.HasValue && employe.UserId > 0 && dto.IsActive == false)
@@ -349,14 +330,12 @@ public class EmployesServices : IEmployesServices
                     Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
                 }
 
-                await transacion.CommitAsync();
                 return Result.Success();
-            }
-            catch (DbUpdateException ex)
-            {
-                await transacion.RollbackAsync();
-                return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"A unique data conflict has occurred. {ex.Message} "));
-            }
+            });
+        }
+        catch (DbUpdateException ex)
+        {
+            return Result<EmployeReponseDto>.Failure(new Error(ErrorCodes.Conflict, $"A unique data conflict has occurred. {ex.Message} "));
         }
         catch (Exception ex)
         {

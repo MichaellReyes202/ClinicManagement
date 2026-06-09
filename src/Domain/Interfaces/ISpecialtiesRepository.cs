@@ -9,7 +9,6 @@ namespace Domain.Interfaces
 {
     public interface ISpecialtiesRepository : IGenericRepository<Specialty>
     {
-        Task UpdateAsync(Specialty specialty);
         Task<bool> DeleteAsync(int id);
         Task<Specialty?> GetByNameAsync(string name);
     }

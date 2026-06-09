@@ -168,80 +168,79 @@ public class AuthService : IAuthService
           .ToList();
       return Result<UserDto>.Failure(errors);
     }
-    using var transaction = await _employesRepository.BeginTransactionAsync();
     try
     {
-      var employe = await _employesRepository.GetByIdAsync(registerDto.EmployeeId);
-      if (employe is null)
-        return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The employee with ID '{registerDto.EmployeeId}' does not exist."));
-
-      if (employe.UserId.HasValue && employe.UserId.Value > 0)
-        return Result<UserDto>.Failure(new Error(ErrorCodes.Conflict, "The employee already has an associated user account."));
-
-      var role = await _roleRepository.GetByIdAsync(registerDto.RoleId);
-      if (role is null)
+      return await _employesRepository.ExecuteInTransactionAsync(async () =>
       {
-        return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The role with ID '{registerDto.RoleId}' does not exist."));
-      }
+        var employe = await _employesRepository.GetByIdAsync(registerDto.EmployeeId);
+        if (employe is null)
+          return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The employee with ID '{registerDto.EmployeeId}' does not exist."));
 
-      var emailGenerator = RemoveDiacritics.Remove($"{employe.FirstName.ToLower()}.{employe.LastName.ToLower()}{employe.Id}@oficentro.com");
-      var initialPassword = PasswordGenerator.GenerateTemporaryPassword();
+        if (employe.UserId.HasValue && employe.UserId.Value > 0)
+          return Result<UserDto>.Failure(new Error(ErrorCodes.Conflict, "The employee already has an associated user account."));
 
-      var userDto = new UserDto
-      {
-        Email = emailGenerator,
-        Password = initialPassword,
-      };
-      var user = _mapper.Map<User>(new UserDto() { Email = emailGenerator });
-
-      var currentUser = await _userService.GetCurrentUserAsync();
-      if (currentUser != null)
-      {
-        user.CreatedByUserId = currentUser.Id;
-      }
-      user.CreatedAt = DateTime.UtcNow;
-      user.UpdatedAt = DateTime.UtcNow;
-      user.IsActive = true;
-      var result = await _userManager.CreateAsync(user, initialPassword);
-
-      if (result.Succeeded)
-      {
-        var existingUser = await _userManager.FindByEmailAsync(emailGenerator);
-        employe.UserId = existingUser!.Id;
-        await _employesRepository.UpdateEmployeeAsync(employe);
-        await _userManager.AddToRoleAsync(user, role.Name);
-        await _employesRepository.SaveChangesAsync();
-
-        // Audit log para registro exitoso
-        try
+        var role = await _roleRepository.GetByIdAsync(registerDto.RoleId);
+        if (role is null)
         {
-          await _auditlogServices.RegisterActionAsync(
-              userId: existingUser.Id,
-              module: AuditModuletype.Auth,
-              actionType: ActionType.CREATE,
-              recordDisplay: $"{emailGenerator} - {employe.FirstName} {employe.LastName}",
-              recordId: existingUser.Id,
-              status: AuditStatus.SUCCESS,
-              changeDetail: $"User created for employee ID {employe.Id} with role {role.Name}"
-          );
+          return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The role with ID '{registerDto.RoleId}' does not exist."));
         }
-        catch (Exception auditEx)
-        {
-          Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
-        }
-        await transaction.CommitAsync();
-        return Result<UserDto>.Success(userDto);
-      }
-      else
-      {
-        var errors = result.Errors.Select(e => new ValidationError(string.Empty, e.Description)).ToList();
-        return Result<UserDto>.Failure(errors);
-      }
 
+        var emailGenerator = RemoveDiacritics.Remove($"{employe.FirstName.ToLower()}.{employe.LastName.ToLower()}{employe.Id}@oficentro.com");
+        var initialPassword = PasswordGenerator.GenerateTemporaryPassword();
+
+        var userDto = new UserDto
+        {
+          Email = emailGenerator,
+          Password = initialPassword,
+        };
+        var user = _mapper.Map<User>(new UserDto() { Email = emailGenerator });
+
+        var currentUser = await _userService.GetCurrentUserAsync();
+        if (currentUser != null)
+        {
+          user.CreatedByUserId = currentUser.Id;
+        }
+        user.CreatedAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
+        user.IsActive = true;
+        var result = await _userManager.CreateAsync(user, initialPassword);
+
+        if (result.Succeeded)
+        {
+          var existingUser = await _userManager.FindByEmailAsync(emailGenerator);
+          employe.UserId = existingUser!.Id;
+          await _employesRepository.UpdateEmployeeAsync(employe);
+          await _userManager.AddToRoleAsync(user, role.Name);
+          await _employesRepository.SaveChangesAsync();
+
+          // Audit log para registro exitoso
+          try
+          {
+            await _auditlogServices.RegisterActionAsync(
+                userId: existingUser.Id,
+                module: AuditModuletype.Auth,
+                actionType: ActionType.CREATE,
+                recordDisplay: $"{emailGenerator} - {employe.FirstName} {employe.LastName}",
+                recordId: existingUser.Id,
+                status: AuditStatus.SUCCESS,
+                changeDetail: $"User created for employee ID {employe.Id} with role {role.Name}"
+            );
+          }
+          catch (Exception auditEx)
+          {
+            Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
+          }
+          return Result<UserDto>.Success(userDto);
+        }
+        else
+        {
+          var errors = result.Errors.Select(e => new ValidationError(string.Empty, e.Description)).ToList();
+          return Result<UserDto>.Failure(errors);
+        }
+      });
     }
     catch (Exception ex)
     {
-      await transaction.RollbackAsync();
       return Result<UserDto>.Failure(new Error(ErrorCodes.Unexpected, ex.Message));
     }
   }
