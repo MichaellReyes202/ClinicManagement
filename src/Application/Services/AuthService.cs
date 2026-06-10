@@ -266,6 +266,7 @@ public class AuthService : IAuthService
   {
     var claims = new List<Claim>
     {
+      new(ClaimTypes.NameIdentifier, user.Id.ToString()),
       new(ClaimTypes.Email, user.Email),
       new(JwtRegisteredClaimNames.Sub , user.Email),
       new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),

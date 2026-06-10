@@ -1,4 +1,7 @@
 using System.Text;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.Extensions.Caching.Memory;
 using API.Filters;
 using Application.Interfaces;
 using Application.Mappers;
@@ -280,6 +283,29 @@ builder
             OnTokenValidated = context =>
             {
                 Console.WriteLine("Token valido");
+
+                var userIdClaim = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? context.Principal?.FindFirst("sub")?.Value;
+
+                if (!string.IsNullOrEmpty(userIdClaim))
+                {
+                    var cache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+                    string cacheKey = $"user-permissions-updated:{userIdClaim}";
+
+                    if (cache.TryGetValue<DateTime>(cacheKey, out var lastUpdatedDate))
+                    {
+                        if (context.SecurityToken is JwtSecurityToken jwtToken)
+                        {
+                            var tokenIssuedAt = jwtToken.ValidFrom;
+                            if (tokenIssuedAt < lastUpdatedDate)
+                            {
+                                Console.WriteLine($"Token revocado para el usuario {userIdClaim} porque sus permisos cambiaron en {lastUpdatedDate} y el token es de {tokenIssuedAt}");
+                                context.Fail("Los permisos del usuario han sido actualizados. Por favor inicie sesión nuevamente.");
+                            }
+                        }
+                    }
+                }
+
                 return Task.CompletedTask;
             },
             OnChallenge = context =>

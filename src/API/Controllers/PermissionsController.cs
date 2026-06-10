@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace API.Controllers;
 
@@ -17,10 +18,12 @@ namespace API.Controllers;
 public class PermissionsController : ControllerBase
 {
     private readonly ClinicDbContext _context;
+    private readonly IMemoryCache _cache;
 
-    public PermissionsController(ClinicDbContext context)
+    public PermissionsController(ClinicDbContext context, IMemoryCache cache)
     {
         _context = context;
+        _cache = cache;
     }
 
     [HttpGet]
@@ -83,6 +86,11 @@ public class PermissionsController : ControllerBase
             }
 
             await transaction.CommitAsync();
+
+            // Guardar la fecha de actualización de permisos en caché para invalidar el token actual del usuario
+            var cacheKey = $"user-permissions-updated:{dto.UserId}";
+            _cache.Set(cacheKey, DateTime.UtcNow, TimeSpan.FromDays(1));
+
             return Ok(new { message = "Permissions updated successfully" });
         }
         catch (Exception ex)
