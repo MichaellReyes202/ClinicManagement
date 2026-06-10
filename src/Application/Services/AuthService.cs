@@ -284,6 +284,23 @@ public class AuthService : IAuthService
       }
     }
 
+    var userQuery = await _userRepository.GetQuery(
+        u => u.Id == user.Id,
+        include: q => q.Include(u => u.UserViewUsers)!.ThenInclude(uv => uv.View)
+    );
+
+    var viewNames = await userQuery
+        .SelectMany(u => u.UserViewUsers)
+        .Select(uv => uv.View.Name)
+        .Where(name => !string.IsNullOrWhiteSpace(name))
+        .Distinct()
+        .ToListAsync();
+
+    foreach (var viewName in viewNames)
+    {
+      claims.Add(new Claim("view", viewName));
+    }
+
     var jwtSettings = _configuration.GetSection("JwtSettings");
     var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings["Key"]!));
     var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -309,6 +326,7 @@ public class AuthService : IAuthService
         FullName = $"{user.EmployeeUser?.FirstName} {user.EmployeeUser?.LastName}",
         IsActive = user.IsActive,
         Roles = [.. roles],
+        Views = viewNames,
         RoleId = (await _roleRepository.GetQuery(r => roles.Contains(r.Name))).FirstOrDefault()?.Id ?? 0, // Agregar RoleId al response si es necesario
         EmployeeId = user.EmployeeUser?.Id,
         RequiresPasswordChange = user.RequiresPasswordChange

@@ -32,6 +32,8 @@ public partial class ClinicDbContext : DbContext
 
     public virtual DbSet<CatSexo> CatSexos { get; set; }
 
+    public virtual DbSet<CatView> CatViews { get; set; }
+
     public virtual DbSet<ClinicSchedule> ClinicSchedules { get; set; }
 
     public virtual DbSet<Consultation> Consultations { get; set; }
@@ -68,16 +70,8 @@ public partial class ClinicDbContext : DbContext
 
     public virtual DbSet<UserRole> UserRoles { get; set; }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        // Configuration should be provided via DI (AddDbContext). If the options builder
-        // is not configured (e.g., when using design-time tools), we intentionally do nothing
-        // to avoid embedding secrets in source code.
-        if (!optionsBuilder.IsConfigured)
-        {
-            // Leave unconfigured; expect configuration from the host application's services.
-        }
-    }
+    public virtual DbSet<UserView> UserViews { get; set; }
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -148,6 +142,12 @@ public partial class ClinicDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("auditlog_pkey");
 
             entity.ToTable("auditlog");
+
+            entity.HasIndex(e => new { e.Moduleid, e.Statusid }, "ix_auditlog_module_status");
+
+            entity.HasIndex(e => e.Timestamp, "ix_auditlog_timestamp").IsDescending();
+
+            entity.HasIndex(e => e.Performedbyuserid, "ix_auditlog_user");
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Actiontype)
@@ -266,6 +266,24 @@ public partial class ClinicDbContext : DbContext
                 .HasColumnName("name");
         });
 
+        modelBuilder.Entity<CatView>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("cat_views_pkey");
+
+            entity.ToTable("cat_views");
+
+            entity.HasIndex(e => e.Name, "cat_views_name_key").IsUnique();
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.Description).HasColumnName("description");
+            entity.Property(e => e.Name)
+                .HasMaxLength(100)
+                .HasColumnName("name");
+            entity.Property(e => e.Route)
+                .HasMaxLength(255)
+                .HasColumnName("route");
+        });
+
         modelBuilder.Entity<ClinicSchedule>(entity =>
         {
             entity.HasKey(e => e.Id).HasName("clinic_schedules_pkey");
@@ -281,6 +299,7 @@ public partial class ClinicDbContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnName("created_at");
+            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
             entity.Property(e => e.DayName)
                 .HasMaxLength(15)
                 .HasColumnName("day_name");
@@ -294,6 +313,17 @@ public partial class ClinicDbContext : DbContext
             entity.Property(e => e.UpdatedAt)
                 .HasDefaultValueSql("now()")
                 .HasColumnName("updated_at");
+            entity.Property(e => e.UpdatedByUserId).HasColumnName("updated_by_user_id");
+
+            entity.HasOne(d => d.CreatedByUser).WithMany(p => p.ClinicScheduleCreatedByUsers)
+                .HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("clinic_schedules_created_by_user_id_fkey");
+
+            entity.HasOne(d => d.UpdatedByUser).WithMany(p => p.ClinicScheduleUpdatedByUsers)
+                .HasForeignKey(d => d.UpdatedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("clinic_schedules_updated_by_user_id_fkey");
         });
 
         modelBuilder.Entity<Consultation>(entity =>
@@ -1001,6 +1031,33 @@ public partial class ClinicDbContext : DbContext
             entity.HasOne(d => d.User).WithMany(p => p.UserRoleUsers)
                 .HasForeignKey(d => d.UserId)
                 .HasConstraintName("user_roles_user_id_fkey");
+        });
+
+        modelBuilder.Entity<UserView>(entity =>
+        {
+            entity.HasKey(e => new { e.UserId, e.ViewId }).HasName("user_views_pkey");
+
+            entity.ToTable("user_views");
+
+            entity.Property(e => e.UserId).HasColumnName("user_id");
+            entity.Property(e => e.ViewId).HasColumnName("view_id");
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at");
+            entity.Property(e => e.GrantedByUserId).HasColumnName("granted_by_user_id");
+
+            entity.HasOne(d => d.GrantedByUser).WithMany(p => p.UserViewGrantedByUsers)
+                .HasForeignKey(d => d.GrantedByUserId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("user_views_granted_by_user_id_fkey");
+
+            entity.HasOne(d => d.User).WithMany(p => p.UserViewUsers)
+                .HasForeignKey(d => d.UserId)
+                .HasConstraintName("user_views_user_id_fkey");
+
+            entity.HasOne(d => d.View).WithMany(p => p.UserViews)
+                .HasForeignKey(d => d.ViewId)
+                .HasConstraintName("user_views_view_id_fkey");
         });
 
         OnModelCreatingPartial(modelBuilder);

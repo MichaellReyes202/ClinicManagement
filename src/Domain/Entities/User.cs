@@ -39,6 +39,10 @@ public partial class User
 
     public virtual ICollection<Auditlog> Auditlogs { get; set; } = new List<Auditlog>();
 
+    public virtual ICollection<ClinicSchedule> ClinicScheduleCreatedByUsers { get; set; } = new List<ClinicSchedule>();
+
+    public virtual ICollection<ClinicSchedule> ClinicScheduleUpdatedByUsers { get; set; } = new List<ClinicSchedule>();
+
     public virtual ICollection<Consultation> ConsultationCreatedByUsers { get; set; } = new List<Consultation>();
 
     public virtual ICollection<Consultation> ConsultationUpdatedByUsers { get; set; } = new List<Consultation>();
@@ -72,4 +76,8 @@ public partial class User
     public virtual ICollection<UserRole> UserRoleCreatedByUsers { get; set; } = new List<UserRole>();
 
     public virtual ICollection<UserRole> UserRoleUsers { get; set; } = new List<UserRole>();
+
+    public virtual ICollection<UserView> UserViewGrantedByUsers { get; set; } = new List<UserView>();
+
+    public virtual ICollection<UserView> UserViewUsers { get; set; } = new List<UserView>();
 }

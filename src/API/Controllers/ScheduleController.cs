@@ -32,7 +32,7 @@ namespace API.Controllers
 
         /// <summary>PUT /api/schedules/clinic/{id} — Actualiza un día del horario de la clínica.</summary>
         [HttpPut("clinic/{id:int}")]
-        [Authorize(Policy = "RequireAdmin")]
+        [Authorize(Policy = "RequireAdministrationView")]
         [ProducesResponseType(typeof(ClinicScheduleDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -56,7 +56,7 @@ namespace API.Controllers
 
         /// <summary>PUT /api/schedules/employee/{employeeId}/day — Crea o actualiza el horario de un doctor para un día.</summary>
         [HttpPut("employee/{employeeId:int}/day")]
-        [Authorize(Policy = "RequireAdmin")]
+        [Authorize(Policy = "RequireAdministrationView")]
         [ProducesResponseType(typeof(EmployeeScheduleDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -68,7 +68,7 @@ namespace API.Controllers
 
         /// <summary>PUT /api/schedules/employee/{employeeId}/duration — Actualiza la duración estándar de cita de un doctor.</summary>
         [HttpPut("employee/{employeeId:int}/duration")]
-        [Authorize(Policy = "RequireAdmin")]
+        [Authorize(Policy = "RequireAdministrationView")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

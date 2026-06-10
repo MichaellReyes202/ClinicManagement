@@ -8,7 +8,7 @@ namespace API.Controllers
 {
   [Route("api/[controller]")]
   [ApiController]
-  [Authorize(Roles = "Admin,Director")]
+  [Authorize(Policy = "RequireReportsView")]
   // 1 = Admin, 4 = Director (asignados en la política o verificados manualmente si es necesario)
   // Suponiendo que «Admin» y «Director» son nombres de roles. Si se utilizan ID, podría ser necesario crear una política personalizada o comprobar las reclamaciones del usuario.
   // Por ahora, supongamos que se trata de nombres de roles estándar o que el sistema de autenticación se encarga de ello.

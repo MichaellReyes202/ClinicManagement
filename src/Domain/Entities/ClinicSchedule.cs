@@ -20,4 +20,12 @@ public partial class ClinicSchedule
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    public int? CreatedByUserId { get; set; }
+
+    public int? UpdatedByUserId { get; set; }
+
+    public virtual User? CreatedByUser { get; set; }
+
+    public virtual User? UpdatedByUser { get; set; }
 }
