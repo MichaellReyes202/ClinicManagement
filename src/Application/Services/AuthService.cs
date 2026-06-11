@@ -203,6 +203,7 @@ public class AuthService : IAuthService
         user.CreatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
         user.IsActive = true;
+        user.RequiresPasswordChange = true;
         var result = await _userManager.CreateAsync(user, initialPassword);
 
         if (result.Succeeded)
@@ -230,6 +231,31 @@ public class AuthService : IAuthService
           {
             Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
           }
+
+          // Enviar correo con credenciales de acceso al correo personal del empleado
+          if (!string.IsNullOrEmpty(employe.Email))
+          {
+            try
+            {
+              var subject = "Tus credenciales de acceso - Clínica Oficentro";
+              var body = $@"
+                <p>Hola {employe.FirstName},</p>
+                <p>Se ha creado exitosamente tu cuenta de usuario para acceder al sistema de Clínica Oficentro.</p>
+                <p>Tus datos de acceso son:</p>
+                <ul>
+                  <li><strong>Usuario:</strong> {emailGenerator}</li>
+                  <li><strong>Contraseña temporal:</strong> {initialPassword}</li>
+                </ul>
+                <p>Por seguridad, se te solicitará cambiar tu contraseña la primera vez que inicies sesión.</p>
+              ";
+              await _emailService.SendEmailAsync(employe.Email, subject, body);
+            }
+            catch (Exception emailEx)
+            {
+              Console.WriteLine($"Error enviando correo de bienvenida a '{employe.Email}': {emailEx.Message}");
+            }
+          }
+
           return Result<UserDto>.Success(userDto);
         }
         else
