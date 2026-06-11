@@ -15,5 +15,7 @@ public partial class Role
 
     public DateTime UpdatedAt { get; set; }
 
+    public virtual ICollection<RoleView> RoleViews { get; set; } = new List<RoleView>();
+
     public virtual ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 }

@@ -1,4 +1,4 @@
-﻿using Application.DTOs;
+using Application.DTOs;
 using Application.DTOs.User;
 using Application.Interfaces;
 using Domain.Entities;
@@ -32,7 +32,20 @@ namespace Application.Services
        {
             try
             {
+                System.Linq.Expressions.Expression<System.Func<User, bool>>? filter = null;
+                if (!string.IsNullOrWhiteSpace(pagination.Query))
+                {
+                    var q = pagination.Query.Trim().ToLower();
+                    filter = e => e.Email.ToLower().Contains(q) || 
+                                  (e.EmployeeUser != null && (
+                                      e.EmployeeUser.FirstName.ToLower().Contains(q) || 
+                                      e.EmployeeUser.LastName.ToLower().Contains(q) ||
+                                      (e.EmployeeUser.Dni != null && e.EmployeeUser.Dni.ToLower().Contains(q))
+                                  ));
+                }
+
                 var (baseQuery, total) = await _userRepository.GetQueryAndTotal( 
+                    filter: filter,
                     include : q => q.Include(e => e.EmployeeUser).Include(e => e.UserRoleUsers).ThenInclude(ur => ur.Role)
                 );
                 var proyectQuery = baseQuery

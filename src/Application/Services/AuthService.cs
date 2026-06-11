@@ -287,15 +287,27 @@ public class AuthService : IAuthService
 
     var userQuery = await _userRepository.GetQuery(
         u => u.Id == user.Id,
-        include: q => q.Include(u => u.UserViewUsers)!.ThenInclude(uv => uv.View)
+        include: q => q
+            .Include(u => u.UserViewUsers)!.ThenInclude(uv => uv.View)
+            .Include(u => u.UserRoleUsers)!.ThenInclude(ur => ur.Role)!.ThenInclude(r => r.RoleViews)!.ThenInclude(rv => rv.View)
     );
 
-    var viewNames = await userQuery
-        .SelectMany(u => u.UserViewUsers)
+    var userEntity = await userQuery.FirstOrDefaultAsync();
+
+    var roleViews = userEntity?.UserRoleUsers
+        .SelectMany(ur => ur.Role.RoleViews)
+        .Select(rv => rv.View.Name)
+        ?? Enumerable.Empty<string>();
+
+    var customViews = userEntity?.UserViewUsers
         .Select(uv => uv.View.Name)
+        ?? Enumerable.Empty<string>();
+
+    var viewNames = roleViews
+        .Concat(customViews)
         .Where(name => !string.IsNullOrWhiteSpace(name))
         .Distinct()
-        .ToListAsync();
+        .ToList();
 
     foreach (var viewName in viewNames)
     {

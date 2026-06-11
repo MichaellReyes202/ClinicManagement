@@ -1,7 +1,6 @@
-using System.Text;
-using System.Security.Claims;
 using System.IdentityModel.Tokens.Jwt;
-using Microsoft.Extensions.Caching.Memory;
+using System.Security.Claims;
+using System.Text;
 using API.Filters;
 using Application.Interfaces;
 using Application.Mappers;
@@ -20,6 +19,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -128,7 +128,11 @@ builder.Services.AddCors(options =>
         policy =>
         {
             policy
-                .WithOrigins("http://localhost:5174", "http://localhost:5173")
+                .WithOrigins(
+                    "http://localhost:5174",
+                    "http://localhost:5173",
+                    "https://z6jg3mh4-5174.use.devtunnels.ms"
+                )
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials(); // si usas cookies o tokens Bearer
@@ -284,12 +288,14 @@ builder
             {
                 Console.WriteLine("Token valido");
 
-                var userIdClaim = context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                var userIdClaim =
+                    context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value
                     ?? context.Principal?.FindFirst("sub")?.Value;
 
                 if (!string.IsNullOrEmpty(userIdClaim))
                 {
-                    var cache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+                    var cache =
+                        context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
                     string cacheKey = $"user-permissions-updated:{userIdClaim}";
 
                     if (cache.TryGetValue<DateTime>(cacheKey, out var lastUpdatedDate))
@@ -299,8 +305,12 @@ builder
                             var tokenIssuedAt = jwtToken.ValidFrom;
                             if (tokenIssuedAt < lastUpdatedDate)
                             {
-                                Console.WriteLine($"Token revocado para el usuario {userIdClaim} porque sus permisos cambiaron en {lastUpdatedDate} y el token es de {tokenIssuedAt}");
-                                context.Fail("Los permisos del usuario han sido actualizados. Por favor inicie sesión nuevamente.");
+                                Console.WriteLine(
+                                    $"Token revocado para el usuario {userIdClaim} porque sus permisos cambiaron en {lastUpdatedDate} y el token es de {tokenIssuedAt}"
+                                );
+                                context.Fail(
+                                    "Los permisos del usuario han sido actualizados. Por favor inicie sesión nuevamente."
+                                );
                             }
                         }
                     }
@@ -321,15 +331,72 @@ builder
 builder
     .Services.AddAuthorizationBuilder()
     .AddPolicy("RequireDashboardView", policy => policy.RequireClaim("view", "Dashboard"))
-    .AddPolicy("RequirePatientsView", policy => policy.RequireClaim("view", "Pacientes - Buscar", "Pacientes - Registrar", "Pacientes - Historial de Paciente"))
-    .AddPolicy("RequireBillingView", policy => policy.RequireClaim("view", "Facturación - Factura", "Facturación - Pagos", "Facturación - Cierre de caja", "Facturación - Promociones"))
-    .AddPolicy("RequireConsultationsView", policy => policy.RequireClaim("view", "Citas - Hoy", "Citas - Agendar", "Citas - Disponibilidad", "Consultas - Activa", "Consultas - Crear", "Consultas - Historial"))
-    .AddPolicy("RequireLabView", policy => policy.RequireClaim("view", "Laboratorio - Registrar Resultados", "Laboratorio - Historial", "Laboratorio - Catálogo de Exámenes"))
-    .AddPolicy("RequireHRView", policy => policy.RequireClaim("view", "Recursos Humanos - Empleados", "Recursos Humanos - Asistencia", "Recursos Humanos - Especialidades", "Recursos Humanos - Cargos"))
+    .AddPolicy(
+        "RequirePatientsView",
+        policy =>
+            policy.RequireClaim(
+                "view",
+                "Pacientes - Buscar",
+                "Pacientes - Registrar",
+                "Pacientes - Historial de Paciente"
+            )
+    )
+    .AddPolicy(
+        "RequireBillingView",
+        policy =>
+            policy.RequireClaim(
+                "view",
+                "Facturación - Factura",
+                "Facturación - Pagos",
+                "Facturación - Cierre de caja",
+                "Facturación - Promociones"
+            )
+    )
+    .AddPolicy(
+        "RequireConsultationsView",
+        policy =>
+            policy.RequireClaim(
+                "view",
+                "Citas - Hoy",
+                "Citas - Agendar",
+                "Citas - Disponibilidad",
+                "Consultas - Activa",
+                "Consultas - Crear",
+                "Consultas - Historial"
+            )
+    )
+    .AddPolicy(
+        "RequireLabView",
+        policy =>
+            policy.RequireClaim(
+                "view",
+                "Laboratorio - Registrar Resultados",
+                "Laboratorio - Historial",
+                "Laboratorio - Catálogo de Exámenes"
+            )
+    )
+    .AddPolicy(
+        "RequireHRView",
+        policy =>
+            policy.RequireClaim(
+                "view",
+                "Recursos Humanos - Empleados",
+                "Recursos Humanos - Asistencia",
+                "Recursos Humanos - Especialidades",
+                "Recursos Humanos - Cargos"
+            )
+    )
     .AddPolicy("RequireReportsView", policy => policy.RequireClaim("view", "Reportes"))
     .AddPolicy(
         "RequireAdministrationView",
-        policy => policy.RequireClaim("view", "Administración - Usuarios", "Administración - Horarios", "Administración - Auditoría", "Administración - Archivos Digitales")
+        policy =>
+            policy.RequireClaim(
+                "view",
+                "Administración - Usuarios",
+                "Administración - Horarios",
+                "Administración - Auditoría",
+                "Administración - Archivos Digitales"
+            )
     );
 builder.Services.AddOpenApi();
 
@@ -344,14 +411,15 @@ app.UseHttpsRedirection(); // Ahora va después de UseCors
 
 app.UseCors("AllowFrontend"); // Mover aquí
 
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+app.Run();
+
+
 //app.Use(async (context, next) =>
 //{
 //    Console.WriteLine($"Request incoming: {context.Request.Method} {context.Request.Path}");
 //    Console.WriteLine($"Authorization header: {context.Request.Headers["Authorization"].FirstOrDefault() ?? "NO HEADER"}");
 //    await next();
 //});
-
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-app.Run();

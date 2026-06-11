@@ -71,6 +71,8 @@ public partial class User
 
     public virtual ICollection<Promotion> Promotions { get; set; } = new List<Promotion>();
 
+    public virtual ICollection<RoleView> RoleViews { get; set; } = new List<RoleView>();
+
     public virtual User? UpdatedByUser { get; set; }
 
     public virtual ICollection<UserRole> UserRoleCreatedByUsers { get; set; } = new List<UserRole>();
