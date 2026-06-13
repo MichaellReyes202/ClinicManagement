@@ -170,7 +170,12 @@ public class AuthService : IAuthService
     }
     try
     {
-      return await _employesRepository.ExecuteInTransactionAsync(async () =>
+      string? targetEmail = null;
+      string? firstName = null;
+      string? emailGenerator = null;
+      string? initialPassword = null;
+
+      var transactionResult = await _employesRepository.ExecuteInTransactionAsync(async () =>
       {
         var employe = await _employesRepository.GetByIdAsync(registerDto.EmployeeId);
         if (employe is null)
@@ -185,8 +190,8 @@ public class AuthService : IAuthService
           return Result<UserDto>.Failure(new Error(ErrorCodes.NotFound, $"The role with ID '{registerDto.RoleId}' does not exist."));
         }
 
-        var emailGenerator = RemoveDiacritics.Remove($"{employe.FirstName.ToLower()}.{employe.LastName.ToLower()}{employe.Id}@oficentro.com");
-        var initialPassword = PasswordGenerator.GenerateTemporaryPassword();
+        emailGenerator = RemoveDiacritics.Remove($"{employe.FirstName.ToLower()}.{employe.LastName.ToLower()}{employe.Id}@oficentro.com");
+        initialPassword = PasswordGenerator.GenerateTemporaryPassword();
 
         var userDto = new UserDto
         {
@@ -214,6 +219,9 @@ public class AuthService : IAuthService
           await _userManager.AddToRoleAsync(user, role.Name);
           await _employesRepository.SaveChangesAsync();
 
+          targetEmail = employe.Email;
+          firstName = employe.FirstName;
+
           // Audit log para registro exitoso
           try
           {
@@ -232,30 +240,6 @@ public class AuthService : IAuthService
             Console.WriteLine($"Error registrando auditoría: {auditEx.Message}");
           }
 
-          // Enviar correo con credenciales de acceso al correo personal del empleado
-          if (!string.IsNullOrEmpty(employe.Email))
-          {
-            try
-            {
-              var subject = "Tus credenciales de acceso - Clínica Oficentro";
-              var body = $@"
-                <p>Hola {employe.FirstName},</p>
-                <p>Se ha creado exitosamente tu cuenta de usuario para acceder al sistema de Clínica Oficentro.</p>
-                <p>Tus datos de acceso son:</p>
-                <ul>
-                  <li><strong>Usuario:</strong> {emailGenerator}</li>
-                  <li><strong>Contraseña temporal:</strong> {initialPassword}</li>
-                </ul>
-                <p>Por seguridad, se te solicitará cambiar tu contraseña la primera vez que inicies sesión.</p>
-              ";
-              await _emailService.SendEmailAsync(employe.Email, subject, body);
-            }
-            catch (Exception emailEx)
-            {
-              Console.WriteLine($"Error enviando correo de bienvenida a '{employe.Email}': {emailEx.Message}");
-            }
-          }
-
           return Result<UserDto>.Success(userDto);
         }
         else
@@ -264,6 +248,35 @@ public class AuthService : IAuthService
           return Result<UserDto>.Failure(errors);
         }
       });
+
+      // Enviar correo de bienvenida fuera de la transacción en segundo plano
+      if (transactionResult.IsSuccess && !string.IsNullOrEmpty(targetEmail))
+      {
+        _ = Task.Run(async () =>
+        {
+          try
+          {
+            var subject = "Tus credenciales de acceso - Clínica Oficentro";
+            var body = $@"
+              <p>Hola {firstName},</p>
+              <p>Se ha creado exitosamente tu cuenta de usuario para acceder al sistema de Clínica Oficentro.</p>
+              <p>Tus datos de acceso son:</p>
+              <ul>
+                <li><strong>Usuario:</strong> {emailGenerator}</li>
+                <li><strong>Contraseña temporal:</strong> {initialPassword}</li>
+              </ul>
+              <p>Por seguridad, se te solicitará cambiar tu contraseña la primera vez que inicies sesión.</p>
+            ";
+            await _emailService.SendEmailAsync(targetEmail, subject, body);
+          }
+          catch (Exception emailEx)
+          {
+            Console.WriteLine($"Error enviando correo de bienvenida en segundo plano a '{targetEmail}': {emailEx.Message}");
+          }
+        });
+      }
+
+      return transactionResult;
     }
     catch (Exception ex)
     {
@@ -297,19 +310,6 @@ public class AuthService : IAuthService
       new(JwtRegisteredClaimNames.Sub , user.Email),
       new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
     };
-    var roles = await _userManager.GetRolesAsync(user);
-
-    foreach (var roleName in roles)
-    {
-      claims.Add(new Claim(ClaimTypes.Role, roleName));
-
-      // Buscar el ID del rol para agregarlo como claim
-      var roleEntity = (await _roleRepository.GetQuery(r => r.Name == roleName)).FirstOrDefault();
-      if (roleEntity != null)
-      {
-        claims.Add(new Claim("roleId", roleEntity.Id.ToString()));
-      }
-    }
 
     var userQuery = await _userRepository.GetQuery(
         u => u.Id == user.Id,
@@ -320,14 +320,39 @@ public class AuthService : IAuthService
 
     var userEntity = await userQuery.FirstOrDefaultAsync();
 
-    var roleViews = userEntity?.UserRoleUsers
-        .SelectMany(ur => ur.Role.RoleViews)
-        .Select(rv => rv.View.Name)
-        ?? Enumerable.Empty<string>();
+    var roles = new List<string>();
+    int firstRoleId = 0;
 
-    var customViews = userEntity?.UserViewUsers
-        .Select(uv => uv.View.Name)
-        ?? Enumerable.Empty<string>();
+    if (userEntity != null && userEntity.UserRoleUsers != null)
+    {
+      foreach (var userRole in userEntity.UserRoleUsers)
+      {
+        if (userRole.Role != null)
+        {
+          roles.Add(userRole.Role.Name);
+          claims.Add(new Claim(ClaimTypes.Role, userRole.Role.Name));
+          claims.Add(new Claim("roleId", userRole.RoleId.ToString()));
+          if (firstRoleId == 0)
+          {
+            firstRoleId = userRole.RoleId;
+          }
+        }
+      }
+    }
+
+    var roleViews = userEntity?.UserRoleUsers != null
+        ? userEntity.UserRoleUsers
+            .Where(ur => ur.Role != null && ur.Role.RoleViews != null)
+            .SelectMany(ur => ur.Role!.RoleViews!)
+            .Where(rv => rv.View != null)
+            .Select(rv => rv.View!.Name)
+        : Enumerable.Empty<string>();
+
+    var customViews = userEntity?.UserViewUsers != null
+        ? userEntity.UserViewUsers
+            .Where(uv => uv.View != null)
+            .Select(uv => uv.View!.Name)
+        : Enumerable.Empty<string>();
 
     var viewNames = roleViews
         .Concat(customViews)
@@ -349,6 +374,7 @@ public class AuthService : IAuthService
          issuer: null,// jwtSettings["Issuer"],
          audience: null, // jwtSettings["Audience"],
          claims: claims,
+         notBefore: DateTime.UtcNow,
          expires: expiration,
          signingCredentials: credentials
      );
@@ -366,7 +392,7 @@ public class AuthService : IAuthService
         IsActive = user.IsActive,
         Roles = [.. roles],
         Views = viewNames,
-        RoleId = (await _roleRepository.GetQuery(r => roles.Contains(r.Name))).FirstOrDefault()?.Id ?? 0, // Agregar RoleId al response si es necesario
+        RoleId = firstRoleId,
         EmployeeId = user.EmployeeUser?.Id,
         RequiresPasswordChange = user.RequiresPasswordChange
       }
@@ -412,11 +438,22 @@ public class AuthService : IAuthService
         Console.WriteLine($"Error registering audit: {auditEx.Message}");
       }
 
-      // Send email with new password
+      // Send email with new password in the background
       var subject = "Restablecimiento de contraseña - Clínica Oficentro";
       var body = $"<p>Hola {employe.FirstName},</p><p>El administrador ha restablecido tu contraseña.</p><p>Tu nueva contraseña temporal es: <strong>{newPassword}</strong></p><p>Por favor inicia sesión con esta contraseña. Se te pedirá cambiarla inmediatamente.</p>";
       
-      await _emailService.SendEmailAsync(employe.Email, subject, body);
+      var emailTo = employe.Email;
+      _ = Task.Run(async () =>
+      {
+        try
+        {
+          await _emailService.SendEmailAsync(emailTo, subject, body);
+        }
+        catch (Exception emailEx)
+        {
+          Console.WriteLine($"Error enviando correo de restablecimiento de contraseña en segundo plano a '{emailTo}': {emailEx.Message}");
+        }
+      });
 
       return Result<UserDto>.Success(new UserDto
       {

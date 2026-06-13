@@ -46,7 +46,7 @@ public class PatientServices : IPatientServices
   public async Task<Result<PaginatedResponseDto<PatientSearchDto>>> SearchPatient(PaginationDto pagination)
   {
     var searchTerm = pagination.Query?.Trim().ToLower();
-    Expression<Func<Patient, bool>> searchFilter = null;
+    Expression<Func<Patient, bool>>? searchFilter = null;
 
     if (!string.IsNullOrEmpty(searchTerm))
     {
@@ -81,7 +81,7 @@ public class PatientServices : IPatientServices
     try
     {
       var searchTerm = pagination.Query?.Trim().ToLower();
-      Expression<Func<Patient, bool>> searchFilter = null;
+      Expression<Func<Patient, bool>>? searchFilter = null;
 
       if (!string.IsNullOrEmpty(searchTerm))
       {

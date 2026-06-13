@@ -236,7 +236,7 @@ public class ConsultationServices : IConsultationServices
                 Notes = p.Notes,
                 Items = p.PrescriptionItems.Select(pi => new ConsultationPrescriptionItemDto
                 {
-                    MedicationName = pi.Medication.Name,
+                    MedicationName = pi.Medication?.Name ?? string.Empty,
                     Dose = pi.Dose,
                     Frequency = pi.Frequency,
                     Duration = pi.Duration
@@ -288,7 +288,7 @@ public class ConsultationServices : IConsultationServices
                 Notes = p.Notes,
                 Items = p.PrescriptionItems.Select(pi => new ConsultationPrescriptionItemDto
                 {
-                    MedicationName = pi.Medication.Name,
+                    MedicationName = pi.Medication?.Name ?? string.Empty,
                     Dose = pi.Dose,
                     Frequency = pi.Frequency,
                     Duration = pi.Duration
@@ -339,7 +339,7 @@ public class ConsultationServices : IConsultationServices
                 Notes = p.Notes,
                 Items = p.PrescriptionItems.Select(pi => new ConsultationPrescriptionItemDto
                 {
-                    MedicationName = pi.Medication.Name,
+                    MedicationName = pi.Medication?.Name ?? string.Empty,
                     Dose = pi.Dose,
                     Frequency = pi.Frequency,
                     Duration = pi.Duration

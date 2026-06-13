@@ -16,7 +16,7 @@ public class PrescriptionRepository : GenericRepository<Prescription>, IPrescrip
         return await _context.Prescriptions
             .Include(p => p.PrescriptionItems)
             .ThenInclude(pi => pi.Medication)
-            .Include(p => p.Consultation)
+            .Include(p => p.Consultation!)
             .ThenInclude(c => c.Employee)
             .FirstOrDefaultAsync(p => p.ConsultationId == consultationId);
     }

@@ -1,4 +1,4 @@
-﻿
+
 using Application.DTOs.Patient;
 using FluentValidation;
 using System.Text.RegularExpressions;
@@ -79,7 +79,7 @@ public class PatientUpdateValidator : AbstractValidator<PatientUpdateDto>
         // Validación del tutor
         When(x => x.Guardian != null, () =>
         {
-            RuleFor(x => x.Guardian).SetValidator(new PatientGuardianValidator());
+            RuleFor(x => x.Guardian!).SetValidator(new PatientGuardianValidator());
         });
 
         // Validación de coincidencia fecha de nacimiento y cédula

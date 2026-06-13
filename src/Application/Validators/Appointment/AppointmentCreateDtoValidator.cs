@@ -1,13 +1,22 @@
-﻿using Application.DTOs.Appointment;
+using Application.DTOs.Appointment;
+using Domain.Entities;
+using Domain.Interfaces;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Application.Validators.Appointment
 {
     public class AppointmentCreateDtoValidator : AbstractValidator<AppointmentCreateDto>
     {
-        public AppointmentCreateDtoValidator()
+        private readonly IGenericRepository<ClinicSchedule> _clinicScheduleRepo;
+
+        public AppointmentCreateDtoValidator(IGenericRepository<ClinicSchedule> clinicScheduleRepo)
         {
+            _clinicScheduleRepo = clinicScheduleRepo;
+
             RuleFor(x => x.PatientId)
                 .GreaterThan(0)
                 .WithMessage("You must select a patient.");
@@ -25,37 +34,52 @@ namespace Application.Validators.Appointment
                 .NotEmpty().WithMessage("The start date and time are required.")
                 // Relaxed check: Allow up to 10 minutes in the past to account for clock drift
                 .GreaterThanOrEqualTo(x => DateTime.Now.AddMinutes(-10))
-                .WithMessage("Appointments cannot be scheduled in the past.");
-                //.Must(BeWithinBusinessHours)
-                //.WithMessage("The start time must be within the permitted hours (Mon-Fri 08:00-17:00, Sat 08:00-12:00).");
+                .WithMessage("Appointments cannot be scheduled in the past.")
+                .MustAsync(BeWithinClinicBusinessHoursAsync)
+                .WithMessage("The start time must be within the clinic's business hours.");
 
-            /*
-            // Validación cruzada: Que la hora de FIN caiga dentro del horario laboral
+            // Validación cruzada de duración y hora de finalización
             RuleFor(x => x)
-                .Must(x =>
-                {
-                    var endTime = x.StartTime.AddMinutes(x.Duration);
-                    return BeWithinBusinessHours(endTime);
-                })
-                .WithMessage("The appointment duration extends beyond working hours.")
+                .MustAsync(BeWithinWorkingDayAsync)
+                .WithMessage("The appointment must start and end within the clinic's business hours on the same day.")
                 .OverridePropertyName("Duration");
-            */
         }
 
-        private bool BeWithinBusinessHours(DateTime dateTime)
+        private async Task<bool> BeWithinClinicBusinessHoursAsync(DateTime startTime, CancellationToken cancellationToken)
         {
-            var day = dateTime.DayOfWeek;
-            var time = dateTime.TimeOfDay;
+            var dayOfWeek = (short)startTime.DayOfWeek;
+            var query = await _clinicScheduleRepo.GetQuery(filter: s => s.DayOfWeek == dayOfWeek);
+            var schedule = await query.FirstOrDefaultAsync(cancellationToken);
 
-            if (day == DayOfWeek.Sunday)
+            if (schedule == null || !schedule.IsOpen)
                 return false;
 
-            if (day == DayOfWeek.Saturday)
-                // Sábados 8:00 AM - 5:00 PM
-                return time >= TimeSpan.FromHours(8) && time <= TimeSpan.FromHours(17);
+            var time = TimeOnly.FromDateTime(startTime);
+            return time >= schedule.OpenTime && time < schedule.CloseTime;
+        }
 
-            // Lunes a Viernes 8:00 AM - 5:00 PM
-            return time >= TimeSpan.FromHours(8) && time <= TimeSpan.FromHours(17);
+        private async Task<bool> BeWithinWorkingDayAsync(AppointmentCreateDto dto, CancellationToken cancellationToken)
+        {
+            var startTime = dto.StartTime;
+            var endTime = startTime.AddMinutes(dto.Duration);
+
+            var startDayOfWeek = (short)startTime.DayOfWeek;
+            var endDayOfWeek = (short)endTime.DayOfWeek;
+
+            // No permitir cruzar días (debe finalizar el mismo día)
+            if (startDayOfWeek != endDayOfWeek)
+                return false;
+
+            var query = await _clinicScheduleRepo.GetQuery(filter: s => s.DayOfWeek == startDayOfWeek);
+            var schedule = await query.FirstOrDefaultAsync(cancellationToken);
+
+            if (schedule == null || !schedule.IsOpen)
+                return false;
+
+            var startTimeOnly = TimeOnly.FromDateTime(startTime);
+            var endTimeOnly = TimeOnly.FromDateTime(endTime);
+
+            return startTimeOnly >= schedule.OpenTime && endTimeOnly <= schedule.CloseTime;
         }
     }
 }

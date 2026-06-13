@@ -20,7 +20,7 @@ public class EmployesUpdateDto
     public  int PositionId { get; set; }
     public  string? ContactPhone { get; set; }
     public DateTime HireDate { get; set; } 
-    public  string Dni { get; set; }
+    public  string Dni { get; set; } = null!;
     public required string Email { get; set; }
     public  bool IsActive { get; set; }
     public  int? SpecialtyId  { get; set; }

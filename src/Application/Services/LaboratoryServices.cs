@@ -94,6 +94,10 @@ public class LaboratoryServices : ILaboratoryServices
             }
 
             var currentUser = await _userService.GetCurrentUserAsync();
+            if (currentUser == null)
+            {
+                return Result.Failure(new Error(ErrorCodes.Unauthorized, "No active user session found."));
+            }
             // Find employee associated with current user
             // Assuming 1-to-1 relation or logic to find employee
             // For now, we might need to inject EmployesRepository to find the employee ID of the current user
@@ -121,7 +125,7 @@ public class LaboratoryServices : ILaboratoryServices
         var query = await _examRepository.GetQuery(e => e.StatusId == 1 || e.StatusId == 3); // Programado or En Proceso
         var exams = await query
             .Include(e => e.ExamType).ThenInclude(et => et.Specialty)
-            .Include(e => e.Appointment).ThenInclude(a => a.Patient)
+            .Include(e => e.Appointment!).ThenInclude(a => a.Patient)
             .Include(e => e.Status)
             .OrderBy(e => e.CreatedAt)
             .ToListAsync();
@@ -132,7 +136,7 @@ public class LaboratoryServices : ILaboratoryServices
             ExamTypeId = e.ExamTypeId,
             ExamTypeName = e.ExamType.Name,
             PatientId = e.Appointment?.PatientId ?? 0,
-            PatientName = e.Appointment?.Patient != null ? $"{e.Appointment.Patient.FirstName} {e.Appointment.Patient.LastName}" : "Unknown",
+            PatientName = e.Appointment?.Patient is { } patient ? $"{patient.FirstName} {patient.LastName}" : "Unknown",
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
             Results = e.Results,
@@ -149,7 +153,7 @@ public class LaboratoryServices : ILaboratoryServices
         var query = await _examRepository.GetQuery(e => e.AppointmentId == appointmentId);
         var exams = await query
             .Include(e => e.ExamType).ThenInclude(et => et.Specialty)
-            .Include(e => e.Appointment).ThenInclude(a => a.Patient)
+            .Include(e => e.Appointment!).ThenInclude(a => a.Patient)
             .Include(e => e.Status)
             .ToListAsync();
 
@@ -159,7 +163,7 @@ public class LaboratoryServices : ILaboratoryServices
             ExamTypeId = e.ExamTypeId,
             ExamTypeName = e.ExamType.Name,
             PatientId = e.Appointment?.PatientId ?? 0,
-            PatientName = e.Appointment?.Patient != null ? $"{e.Appointment.Patient.FirstName} {e.Appointment.Patient.LastName}" : "Unknown",
+            PatientName = e.Appointment?.Patient is { } patient ? $"{patient.FirstName} {patient.LastName}" : "Unknown",
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
             Results = e.Results,
@@ -172,10 +176,10 @@ public class LaboratoryServices : ILaboratoryServices
     }
     public async Task<Result<List<ExamPendingDto>>> GetExamsByPatientIdAsync(int patientId)
     {
-        var query = await _examRepository.GetQuery(e => e.Appointment.PatientId == patientId);
+        var query = await _examRepository.GetQuery(e => e.Appointment!.PatientId == patientId);
         var exams = await query
             .Include(e => e.ExamType).ThenInclude(et => et.Specialty)
-            .Include(e => e.Appointment).ThenInclude(a => a.Patient)
+            .Include(e => e.Appointment!).ThenInclude(a => a.Patient)
             .Include(e => e.Status)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
@@ -186,7 +190,7 @@ public class LaboratoryServices : ILaboratoryServices
             ExamTypeId = e.ExamTypeId,
             ExamTypeName = e.ExamType.Name,
             PatientId = e.Appointment?.PatientId ?? 0,
-            PatientName = e.Appointment?.Patient != null ? $"{e.Appointment.Patient.FirstName} {e.Appointment.Patient.LastName}" : "Unknown",
+            PatientName = e.Appointment?.Patient is { } patient ? $"{patient.FirstName} {patient.LastName}" : "Unknown",
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
             Results = e.Results,
@@ -203,7 +207,7 @@ public class LaboratoryServices : ILaboratoryServices
         var query = await _examRepository.GetQuery();
         var exams = await query
             .Include(e => e.ExamType).ThenInclude(et => et.Specialty)
-            .Include(e => e.Appointment).ThenInclude(a => a.Patient)
+            .Include(e => e.Appointment!).ThenInclude(a => a.Patient)
             .Include(e => e.Status)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync();
@@ -214,7 +218,7 @@ public class LaboratoryServices : ILaboratoryServices
             ExamTypeId = e.ExamTypeId,
             ExamTypeName = e.ExamType.Name,
             PatientId = e.Appointment?.PatientId ?? 0,
-            PatientName = e.Appointment?.Patient != null ? $"{e.Appointment.Patient.FirstName} {e.Appointment.Patient.LastName}" : "Unknown",
+            PatientName = e.Appointment?.Patient is { } patient ? $"{patient.FirstName} {patient.LastName}" : "Unknown",
             StatusId = e.StatusId,
             StatusName = e.Status.Name,
             Results = e.Results,

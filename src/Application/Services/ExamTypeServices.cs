@@ -45,7 +45,7 @@ public class ExamTypeServices : IExamTypeServices
         try
         {
             var searchTerm = pagination.Query?.Trim().ToLower();
-            Expression<Func<ExamType, bool>> searchFilter = null;
+            Expression<Func<ExamType, bool>>? searchFilter = null;
 
             if (!string.IsNullOrEmpty(searchTerm))
             {

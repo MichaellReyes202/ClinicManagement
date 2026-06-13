@@ -1,4 +1,4 @@
-﻿using Domain.Entities;
+using Domain.Entities;
 using Domain.Interfaces;
 using Microsoft.AspNetCore.Identity;
 
@@ -50,23 +50,23 @@ namespace Infrastructure.Store
             return Task.FromResult(role.Id.ToString());
         }
 
-        public Task<string> GetRoleNameAsync(Role role, CancellationToken cancellationToken)
+        public Task<string?> GetRoleNameAsync(Role role, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(role.Name ?? string.Empty);
+            return Task.FromResult<string?>(role.Name);
         }
 
         public Task SetRoleNameAsync(Role role, string? roleName, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            role.Name = roleName;
+            role.Name = roleName ?? string.Empty;
             return Task.CompletedTask;
         }
 
-        public Task<string> GetNormalizedRoleNameAsync(Role role, CancellationToken cancellationToken)
+        public Task<string?> GetNormalizedRoleNameAsync(Role role, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return Task.FromResult(role.Name ?? string.Empty);
+            return Task.FromResult<string?>(role.Name);
         }
 
         public Task SetNormalizedRoleNameAsync(Role role, string? normalizedName, CancellationToken cancellationToken)

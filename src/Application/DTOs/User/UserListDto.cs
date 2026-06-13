@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +15,6 @@ public class UserListDto
     public string? Dni { get; set; }
     public DateTime? LastLogin { get; set; }
     public DateTime CreatedAt { get; set; }
-    public string Roles { get; set; }
+    public string Roles { get; set; } = null!;
 }
 

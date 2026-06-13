@@ -2,6 +2,7 @@ using Application.DTOs.Appointment;
 using Application.DTOs.Patient;
 using Application.Interfaces;
 using Application.Util;
+using Application.Validators.Appointment;
 using AutoMapper;
 using Domain.Entities;
 using Domain.Enums;
@@ -19,8 +20,8 @@ namespace Application.Services;
 public class AppointmentServices : IAppointmentServices
 {
   private readonly IAppointmentRepository _appointmentRepository;
-  private readonly IValidator<AppointmentCreateDto> _createValidator;
-  private readonly IValidator<AppointmentUpdateDto> _updateValidator;
+  private readonly AppointmentCreateDtoValidator _createValidator;
+  private readonly AppointmentUpdateDtoValidator _updateValidator;
   private readonly IValidator<UpdateStatusAppointmenDto> _updateStatusValidator;
   private readonly IPatientRepository _patientRepository;
   private readonly IEmployesRepository _employesRepository;
@@ -31,8 +32,8 @@ public class AppointmentServices : IAppointmentServices
   private readonly IAuditlogServices _auditlogServices;
 
   public AppointmentServices(IAppointmentRepository appointmentRepository,
-      IValidator<AppointmentCreateDto> createValidator,
-      IValidator<AppointmentUpdateDto> updateValidator,
+      AppointmentCreateDtoValidator createValidator,
+      AppointmentUpdateDtoValidator updateValidator,
       IValidator<UpdateStatusAppointmenDto> updateStatusValidator,
       IPatientRepository patientRepository,
       IEmployesRepository employesRepository,
@@ -69,7 +70,7 @@ public class AppointmentServices : IAppointmentServices
       var query = await _appointmentRepository.GetQuery(
           filter: c => c.Id == id,
           include: q => q
-              .Include(a => a.Patient).ThenInclude(p => p.BloodType)
+              .Include(a => a.Patient!).ThenInclude(p => p.BloodType)
               .Include(a => a.Employee)
       );
       var appointment = await query.AsNoTracking().FirstOrDefaultAsync();
@@ -77,6 +78,10 @@ public class AppointmentServices : IAppointmentServices
       if (appointment == null)
       {
         return Result<AppointmentDetailDto>.Failure(new Error(ErrorCodes.NotFound, $"Appointment {id} not found", nameof(id)));
+      }
+      if (appointment.Patient == null)
+      {
+        return Result<AppointmentDetailDto>.Failure(new Error(ErrorCodes.NotFound, $"Patient not found for appointment {id}"));
       }
       var today = DateOnly.FromDateTime(DateTime.UtcNow);
       var age = today.Year - appointment.Patient.DateOfBirth.Year;
@@ -373,7 +378,7 @@ public class AppointmentServices : IAppointmentServices
 
     if (filter.Specialty.HasValue)
     {
-      query = query.Where(a => a.Employee.SpecialtyId == filter.Specialty.Value);
+      query = query.Where(a => a.Employee!.SpecialtyId == filter.Specialty.Value);
     }
     if (filter.Doctor.HasValue)
     {
@@ -387,10 +392,10 @@ public class AppointmentServices : IAppointmentServices
     {
       var term = filter.Search.Trim().ToLower();
       query = query.Where(a =>
-          a.Patient.FirstName.ToLower().Contains(term) ||
-          a.Patient.LastName.ToLower().Contains(term) ||
-          a.Employee.FirstName.ToLower().Contains(term) ||
-          a.Employee.LastName.ToLower().Contains(term)
+          a.Patient!.FirstName.ToLower().Contains(term) ||
+          a.Patient!.LastName.ToLower().Contains(term) ||
+          a.Employee!.FirstName.ToLower().Contains(term) ||
+          a.Employee!.LastName.ToLower().Contains(term)
       );
     }
     if (filter.DateFrom.HasValue)
@@ -414,12 +419,12 @@ public class AppointmentServices : IAppointmentServices
         {
           a.Id,
           a.PatientId,
-          PatientFirstName = a.Patient.FirstName,
-          PatientLastName = a.Patient.LastName,
+          PatientFirstName = a.Patient!.FirstName,
+          PatientLastName = a.Patient!.LastName,
           a.EmployeeId,
-          DoctorSpecialtyId = a.Employee.SpecialtyId,
-          DoctorFirstName = a.Employee.FirstName,
-          DoctorLastName = a.Employee.LastName,
+          DoctorSpecialtyId = a.Employee!.SpecialtyId,
+          DoctorFirstName = a.Employee!.FirstName,
+          DoctorLastName = a.Employee!.LastName,
           StartTimeUtc = a.StartTime, // La BD devuelve UTC
           EndTimeUtc = a.EndTime,
           a.Duration,

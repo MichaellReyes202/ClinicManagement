@@ -32,8 +32,6 @@ namespace Application.Services
             _consultationRepository = consultationRepository;
             _examRepository = examRepository;
             
-            // License configuration for QuestPDF (Community)
-            QuestPDF.Settings.License = LicenseType.Community;
         }
 
         #region Medical Productivity
@@ -50,12 +48,12 @@ namespace Application.Services
                 .GroupBy(a => a.EmployeeId)
                 .Select(g => new MedicalProductivityDto
                 {
-                    DoctorName = g.First().Employee != null ? $"{g.First().Employee.FirstName} {g.First().Employee.LastName}" : "Desconocido",
+                    DoctorName = g.First().Employee is { } emp ? $"{emp.FirstName} {emp.LastName}" : "Desconocido",
                     TotalAppointments = g.Count(),
                     Attended = g.Count(a => a.StatusId == 3), // Completed
                     Cancelled = g.Count(a => a.StatusId == 4), // Cancelled
                     AvgDurationMinutes = g.Where(a => a.StatusId == 3 && a.EndTime > a.StartTime)
-                        .Select(a => (a.EndTime.Value - a.StartTime).TotalMinutes)
+                        .Select(a => (a.EndTime!.Value - a.StartTime).TotalMinutes)
                         .DefaultIfEmpty(0)
                         .Average()
                 })

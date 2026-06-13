@@ -1,15 +1,22 @@
-﻿
+
 using Application.DTOs.Appointment;
+using Domain.Entities;
+using Domain.Interfaces;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Application.Validators.Appointment;
 public class AppointmentUpdateDtoValidator : AbstractValidator<AppointmentUpdateDto>
 {
+    private readonly IGenericRepository<ClinicSchedule> _clinicScheduleRepo;
 
-    private static readonly DateTime Now = DateTime.Now;
-    private static readonly DateTime TwoHoursFromNow = Now.AddHours(2);
-    public AppointmentUpdateDtoValidator()
+    public AppointmentUpdateDtoValidator(IGenericRepository<ClinicSchedule> clinicScheduleRepo)
     {
+        _clinicScheduleRepo = clinicScheduleRepo;
+
         // id de la cita
         RuleFor( x => x.Id ).NotNull().GreaterThan(0).WithMessage("appointment id is required");
         // Status de la cita
@@ -23,43 +30,61 @@ public class AppointmentUpdateDtoValidator : AbstractValidator<AppointmentUpdate
         RuleFor(x => x.StartTime)
             .NotEmpty()
             .WithMessage("The start date and time are required.")
-            .GreaterThanOrEqualTo(Now)
+            .GreaterThanOrEqualTo(x => DateTime.Now.AddMinutes(-10))
             .WithMessage("Appointments cannot be scheduled in the past.")
-            .Must(BeWithinBusinessHours)
-            .WithMessage("The start time must be within the permitted hours (Mon-Fri 8:00-17:00, Sat 8:00-12:00).");
+            .MustAsync(BeWithinClinicBusinessHoursAsync)
+            .WithMessage("The start time must be within the clinic's business hours.");
 
-        // Validación cruzada: cita termina >= 2.5 horas después de ahora + dentro del horario
+        // Validación cruzada: cita termina >= 2 horas después de ahora
         RuleFor(x => x)
             .Must(x =>
             {
                 var endTime = x.StartTime.AddMinutes(x.Duration);
-                return endTime >= TwoHoursFromNow;
+                return endTime >= DateTime.Now.AddHours(2);
             })
             .WithMessage("The appointment must end at least 2 hours after the current time.")
             .OverridePropertyName("StartTime");
 
         RuleFor(x => x)
-            .Must(x =>
-            {
-                var endTime = x.StartTime.AddMinutes(x.Duration);
-                return BeWithinBusinessHours(endTime);
-            })
-            .WithMessage("The end time must be within the allowed time.")
+            .MustAsync(BeWithinWorkingDayAsync)
+            .WithMessage("The appointment must start and end within the clinic's business hours on the same day.")
             .OverridePropertyName("Duration");
     }
 
-    private static bool BeWithinBusinessHours(DateTime dateTime)
+    private async Task<bool> BeWithinClinicBusinessHoursAsync(DateTime startTime, CancellationToken cancellationToken)
     {
-        var day = dateTime.DayOfWeek;
-        var time = dateTime.TimeOfDay;
+        var dayOfWeek = (short)startTime.DayOfWeek;
+        var query = await _clinicScheduleRepo.GetQuery(filter: s => s.DayOfWeek == dayOfWeek);
+        var schedule = await query.FirstOrDefaultAsync(cancellationToken);
 
-        if (day == DayOfWeek.Sunday)
+        if (schedule == null || !schedule.IsOpen)
             return false;
 
-        if (day == DayOfWeek.Saturday)
-            return time >= TimeSpan.FromHours(8) && time <= TimeSpan.FromHours(17);
+        var time = TimeOnly.FromDateTime(startTime);
+        return time >= schedule.OpenTime && time < schedule.CloseTime;
+    }
 
-        // Lunes a viernes
-        return time >= TimeSpan.FromHours(8) && time < TimeSpan.FromHours(17.5);
+    private async Task<bool> BeWithinWorkingDayAsync(AppointmentUpdateDto dto, CancellationToken cancellationToken)
+    {
+        var startTime = dto.StartTime;
+        var endTime = startTime.AddMinutes(dto.Duration);
+
+        var startDayOfWeek = (short)startTime.DayOfWeek;
+        var endDayOfWeek = (short)endTime.DayOfWeek;
+
+        // No permitir cruzar días (debe finalizar el mismo día)
+        if (startDayOfWeek != endDayOfWeek)
+            return false;
+
+        var query = await _clinicScheduleRepo.GetQuery(filter: s => s.DayOfWeek == startDayOfWeek);
+        var schedule = await query.FirstOrDefaultAsync(cancellationToken);
+
+        if (schedule == null || !schedule.IsOpen)
+            return false;
+
+        var startTimeOnly = TimeOnly.FromDateTime(startTime);
+        var endTimeOnly = TimeOnly.FromDateTime(endTime);
+
+        return startTimeOnly >= schedule.OpenTime && endTimeOnly <= schedule.CloseTime;
     }
 }

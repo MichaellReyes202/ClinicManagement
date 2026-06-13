@@ -1,4 +1,4 @@
-﻿
+
 using Domain.Entities;
 using Domain.Interfaces;
 using Microsoft.AspNetCore.Identity;
@@ -63,7 +63,7 @@ namespace Infrastructure.Store
             var email = await _userRepository.FindByIdAsync(user.Id.ToString());
             return email?.NormalizedEmail?.ToUpper();
         }
-        public Task<string?> GetUserIdAsync(User user, CancellationToken cancellationToken)
+        public Task<string> GetUserIdAsync(User user, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -72,7 +72,7 @@ namespace Infrastructure.Store
                 throw new ArgumentNullException(nameof(user));
             }
 
-            return Task.FromResult<string?>(user.Id.ToString());
+            return Task.FromResult(user.Id.ToString());
         }
 
         public Task SetUserNameAsync(User user, string? userName, CancellationToken cancellationToken)
@@ -98,7 +98,7 @@ namespace Infrastructure.Store
             await _userRepository.SaveChangesAsync();
             return IdentityResult.Success;
         }
-        public Task<string> GetUserNameAsync(User user, CancellationToken cancellationToken)
+        public Task<string?> GetUserNameAsync(User user, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (user == null)
@@ -106,7 +106,7 @@ namespace Infrastructure.Store
                 throw new ArgumentNullException(nameof(user));
             }
             // Asigna el nombre de usuario. Para tu caso, el email es el nombre de usuario.
-            return Task.FromResult(user.Email ?? string.Empty);
+            return Task.FromResult<string?>(user.Email);
         }
 
 
@@ -131,14 +131,14 @@ namespace Infrastructure.Store
             {
                 throw new ArgumentNullException(nameof(user));
             }
-            return Task.FromResult(user.Email);
+            return Task.FromResult<string?>(user.Email);
         }
         public Task<bool> GetEmailConfirmedAsync(User user, CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
 
         }
-        public Task<string> GetNormalizedEmailAsync(User user, CancellationToken cancellationToken)
+        public Task<string?> GetNormalizedEmailAsync(User user, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -147,8 +147,8 @@ namespace Infrastructure.Store
                 throw new ArgumentNullException(nameof(user));
             }
 
-            // Retorna el email normalizado. Si el email es nulo, retorna cadena vacía.
-            return Task.FromResult(_normalizer.NormalizeEmail(user.Email) ?? string.Empty);
+            // Retorna el email normalizado. Si el email es nulo, retorna null.
+            return Task.FromResult<string?>(_normalizer.NormalizeEmail(user.Email));
         }        public Task SetEmailAsync(User user, string? email, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -159,12 +159,12 @@ namespace Infrastructure.Store
             }
 
             // Asigna el email a la propiedad Email de la entidad
-            user.Email = email;
+            user.Email = email ?? string.Empty;
 
             // Actualiza también el NormalizedEmail para futuras búsquedas.
             // Esto es crucial para un rendimiento óptimo.
             // Necesitas inyectar ILookupNormalizer en el constructor de tu UserStore.
-            user.NormalizedEmail = string.IsNullOrEmpty(email) ? null : _normalizer.NormalizeEmail(email);
+            user.NormalizedEmail = _normalizer.NormalizeEmail(email ?? string.Empty) ?? string.Empty;
 
             return Task.CompletedTask;
         }
@@ -183,7 +183,7 @@ namespace Infrastructure.Store
             }
 
             // Asigna el valor normalizado directamente a la propiedad de la entidad.
-            user.NormalizedEmail = normalizedEmail;
+            user.NormalizedEmail = normalizedEmail ?? string.Empty;
 
             return Task.CompletedTask;
         }
@@ -224,7 +224,7 @@ namespace Infrastructure.Store
                 throw new ArgumentNullException(nameof(user));
             }
 
-            user.NormalizedEmail = normalizedName;
+            user.NormalizedEmail = normalizedName ?? string.Empty;
 
             return Task.CompletedTask;
         }
@@ -238,7 +238,7 @@ namespace Infrastructure.Store
             }
 
             // Asigna el hash de la contraseña a la propiedad de la entidad.
-            user.PasswordHash = passwordHash;
+            user.PasswordHash = passwordHash ?? string.Empty;
 
             return Task.CompletedTask;
         }

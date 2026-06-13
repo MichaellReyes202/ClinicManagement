@@ -52,11 +52,11 @@ namespace Application.Services
                     .Select(e => new UserListDto
                     {
                         Id = e.Id,
-                        EmployerId = e.EmployeeUser.Id,
+                        EmployerId = e.EmployeeUser != null ? e.EmployeeUser.Id : (int?)null,
                         Email = e.Email,
                         IsActive = e.IsActive,
-                        FullName = $"{e.EmployeeUser!.FirstName } {e.EmployeeUser.LastName}",
-                        Dni = e.EmployeeUser.Dni,
+                        FullName = e.EmployeeUser != null ? $"{e.EmployeeUser.FirstName} {e.EmployeeUser.LastName}" : "Sin Empleado",
+                        Dni = e.EmployeeUser != null ? e.EmployeeUser.Dni : null,
                         LastLogin = e.LastLogin,
                         CreatedAt = e.CreatedAt,   
                         Roles  = string.Join(", ", e.UserRoleUsers.Select(ur => ur.Role.Name))

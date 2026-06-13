@@ -123,16 +123,15 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
 builder.Services.AddCors(options =>
 {
+    var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()
+        ?? new[] { "http://localhost:5174", "http://localhost:5173", "https://z6jg3mh4-5174.use.devtunnels.ms" };
+
     options.AddPolicy(
         "AllowFrontend",
         policy =>
         {
             policy
-                .WithOrigins(
-                    "http://localhost:5174",
-                    "http://localhost:5173",
-                    "https://z6jg3mh4-5174.use.devtunnels.ms"
-                )
+                .WithOrigins(allowedOrigins)
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials(); // si usas cookies o tokens Bearer
@@ -220,6 +219,22 @@ builder.Services.AddAutoMapper(cfg => { }, AppDomain.CurrentDomain.GetAssemblies
 builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddValidatorsFromAssemblyContaining<LoginDtoValidator>(); // Escanea el ensamblado donde se encuentra LoginDtoValidator y registra automáticamente todos los validadores que encuentre.
 
+// Desregistrar los validadores de citas de la validación automática por contener reglas MustAsync
+var createValidatorDescriptor = builder.Services.FirstOrDefault(d => d.ServiceType == typeof(IValidator<Application.DTOs.Appointment.AppointmentCreateDto>));
+if (createValidatorDescriptor != null)
+{
+    builder.Services.Remove(createValidatorDescriptor);
+}
+var updateValidatorDescriptor = builder.Services.FirstOrDefault(d => d.ServiceType == typeof(IValidator<Application.DTOs.Appointment.AppointmentUpdateDto>));
+if (updateValidatorDescriptor != null)
+{
+    builder.Services.Remove(updateValidatorDescriptor);
+}
+
+// Registrar de forma concreta para inyección en el servicio
+builder.Services.AddScoped<Application.Validators.Appointment.AppointmentCreateDtoValidator>();
+builder.Services.AddScoped<Application.Validators.Appointment.AppointmentUpdateDtoValidator>();
+
 //builder.Services.AddTransient<SignInManager<User>>();
 //builder.Services.AddTransient<IUserStore<User>, UserStore>();
 
@@ -300,18 +315,25 @@ builder
 
                     if (cache.TryGetValue<DateTime>(cacheKey, out var lastUpdatedDate))
                     {
+                        DateTime? tokenIssuedAt = null;
+
                         if (context.SecurityToken is JwtSecurityToken jwtToken)
                         {
-                            var tokenIssuedAt = jwtToken.ValidFrom;
-                            if (tokenIssuedAt < lastUpdatedDate)
-                            {
-                                Console.WriteLine(
-                                    $"Token revocado para el usuario {userIdClaim} porque sus permisos cambiaron en {lastUpdatedDate} y el token es de {tokenIssuedAt}"
-                                );
-                                context.Fail(
-                                    "Los permisos del usuario han sido actualizados. Por favor inicie sesión nuevamente."
-                                );
-                            }
+                            tokenIssuedAt = jwtToken.ValidFrom;
+                        }
+                        else if (context.SecurityToken is Microsoft.IdentityModel.JsonWebTokens.JsonWebToken jsonWebToken)
+                        {
+                            tokenIssuedAt = jsonWebToken.ValidFrom;
+                        }
+
+                        if (tokenIssuedAt.HasValue && tokenIssuedAt.Value != DateTime.MinValue && tokenIssuedAt.Value < lastUpdatedDate)
+                        {
+                            Console.WriteLine(
+                                $"Token revocado para el usuario {userIdClaim} porque sus permisos cambiaron en {lastUpdatedDate} y el token es de {tokenIssuedAt.Value}"
+                            );
+                            context.Fail(
+                                "Los permisos del usuario han sido actualizados. Por favor inicie sesión nuevamente."
+                            );
                         }
                     }
                 }

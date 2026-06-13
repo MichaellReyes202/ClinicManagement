@@ -1,4 +1,4 @@
-﻿using Application.DTOs.Patient;
+using Application.DTOs.Patient;
 using FluentValidation;
 using System.Text.RegularExpressions;
 
@@ -92,27 +92,27 @@ public class PatientCreateValidator : AbstractValidator<PatientCreateDto>
 
         When(x => x.Guardian != null, () =>
         {
-            RuleFor(x => x.Guardian.FullName)
+            RuleFor(x => x.Guardian!.FullName)
                 .NotEmpty().WithMessage("The guardian's full name is required")
                 .MinimumLength(2).WithMessage("Guardian name must be at least 2 characters")
                 .MaximumLength(200).WithMessage("Guardian name cannot exceed 200 characters")
                 .Matches(_nameRegex).WithMessage("The tutor's name can only contain letters, including accents");
 
-            RuleFor(x => x.Guardian.Relationship)
+            RuleFor(x => x.Guardian!.Relationship)
                 .NotEmpty().WithMessage("Relationship is required")
                 .MinimumLength(2).WithMessage("The relationship must be at least 2 characters")
                 .MaximumLength(100).WithMessage("The relationship cannot exceed 100 characters");
 
-            RuleFor(x => x.Guardian.Dni)
+            RuleFor(x => x.Guardian!.Dni)
                 .Must(dni => string.IsNullOrEmpty(dni) || _nicaraguaCedulaRegex.IsMatch(dni))
                 .WithMessage("The guardian's ID must have the format 000-000000-0000A")
-                .When(x => !string.IsNullOrEmpty(x.Guardian.Dni));
+                .When(x => !string.IsNullOrEmpty(x.Guardian!.Dni));
 
-            RuleFor(x => x.Guardian.ContactPhone)
+            RuleFor(x => x.Guardian!.ContactPhone)
                 .Matches(_phoneRegex).WithMessage("The tutor's phone number must have exactly 8 digits")
-                .When(x => !string.IsNullOrEmpty(x.Guardian.ContactPhone));
+                .When(x => !string.IsNullOrEmpty(x.Guardian!.ContactPhone));
 
-            RuleFor(x => x.Guardian)
+            RuleFor(x => x.Guardian!)
                 .Must(g =>
                 {
                     var values = new[] { g.FullName, g.Relationship, g.Dni, g.ContactPhone };

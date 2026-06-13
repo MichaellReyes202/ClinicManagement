@@ -26,7 +26,7 @@ public class MedicationServices : IMedicationServices
         try
         {
             var searchTerm = pagination.Query?.Trim().ToLower();
-            Expression<Func<Medication, bool>> searchFilter = null;
+            Expression<Func<Medication, bool>>? searchFilter = null;
 
             if (!string.IsNullOrEmpty(searchTerm))
             {
