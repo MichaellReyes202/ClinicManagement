@@ -97,23 +97,6 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 
         // 3. Retornamos 400 Bad Request con nuestra estructura exacta
         return new BadRequestObjectResult(standardError);
-
-        //var validationErrors = context.ModelState
-        //   .Where(ms => ms.Value?.Errors.Count > 0)
-        //   .SelectMany(kvp => kvp.Value!.Errors.Select(e =>
-        //       new ValidationError(kvp.Key, e.ErrorMessage)))
-        //   .ToList();
-        //var result = Result.Failure(validationErrors);
-
-        //return new BadRequestObjectResult(new
-        //{
-        //    message = "Validation failed - check required fields",
-        //    errors = result.ValidationErrors.Select(v => new
-        //    {
-        //        propertyName = v.PropertyName,
-        //        errorMessage = v.ErrorMessage
-        //    })
-        //});
     };
 });
 
@@ -124,14 +107,14 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddCors(options =>
 {
     var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()
-        ?? new[] { "http://localhost:5174", "http://localhost:5173", "https://z6jg3mh4-5174.use.devtunnels.ms" };
+        ?? new[] { "http://localhost:5174", "http://localhost:5173" };
 
     options.AddPolicy(
         "AllowFrontend",
         policy =>
         {
             policy
-                .WithOrigins(allowedOrigins)
+                .SetIsOriginAllowed(origin => true) // Permite cualquier localhost o túnel dev durante desarrollo
                 .AllowAnyMethod()
                 .AllowAnyHeader()
                 .AllowCredentials(); // si usas cookies o tokens Bearer
@@ -429,19 +412,17 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseHttpsRedirection(); // Ahora va después de UseCors
+// 1. CORS debe ir ANTES de cualquier redirección, autenticación o autorización
+app.UseCors("AllowFrontend");
 
-app.UseCors("AllowFrontend"); // Mover aquí
+// 2. Solo redirigir a HTTPS en producción (evita romper peticiones HTTP en desarrollo local)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
 
-
-//app.Use(async (context, next) =>
-//{
-//    Console.WriteLine($"Request incoming: {context.Request.Method} {context.Request.Path}");
-//    Console.WriteLine($"Authorization header: {context.Request.Headers["Authorization"].FirstOrDefault() ?? "NO HEADER"}");
-//    await next();
-//});
