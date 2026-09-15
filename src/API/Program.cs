@@ -21,6 +21,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.SemanticKernel;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -175,7 +178,70 @@ builder.Services.Configure<Application.Models.MailSettings>(
     builder.Configuration.GetSection("EMAIL_SETTINGS")
 );
 builder.Services.AddTransient<IEmailService, EmailService>();
+
+// Configuración y registro de AI / Semantic Kernel (Singleton)
+builder.Services.Configure<Application.Models.AiSettings>(
+    builder.Configuration.GetSection("AiSettings")
+);
+
+builder.Services.AddScoped<IChatToolExecutionTracker, ChatToolExecutionTracker>();
+
+builder.Services.AddSingleton<Kernel>(sp =>
+{
+    var aiSettings = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<Application.Models.AiSettings>>().Value;
+    
+    var httpClient = new HttpClient
+    {
+        Timeout = TimeSpan.FromSeconds(aiSettings.HttpTimeoutSeconds > 0 ? aiSettings.HttpTimeoutSeconds : 180)
+    };
+
+    var kernelBuilder = Kernel.CreateBuilder();
+    kernelBuilder.AddOpenAIChatCompletion(
+        modelId: aiSettings.ModelId,
+        apiKey: string.IsNullOrWhiteSpace(aiSettings.ApiKey) ? "ollama" : aiSettings.ApiKey,
+        endpoint: new Uri(aiSettings.Endpoint),
+        httpClient: httpClient
+    );
+
+    var plugin = new Infrastructure.Plugins.ClinicPlugin(
+        sp.GetRequiredService<IServiceScopeFactory>(),
+        sp.GetRequiredService<IHttpContextAccessor>()
+    );
+    kernelBuilder.Plugins.AddFromObject(plugin, "ClinicPlugin");
+
+    // Registro del filtro de auditoría de invocación de herramientas (acumula en memoria)
+    kernelBuilder.Services.AddSingleton<IFunctionInvocationFilter>(
+        new Infrastructure.Filters.ChatToolInvocationFilter(sp.GetRequiredService<IHttpContextAccessor>())
+    );
+
+    return kernelBuilder.Build();
+});
+
+builder.Services.AddScoped<IChatService, ChatService>();
+
 builder.Services.AddMemoryCache();
+
+// Configuración de Rate Limiting por usuario para proteger Ollama
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("ChatStreamPolicy", httpContext =>
+    {
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? httpContext.User.FindFirst("sub")?.Value
+                  ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                  ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: userId,
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 1,
+                Window = TimeSpan.FromSeconds(5),
+                QueueLimit = 0
+            });
+    });
+});
 
 // Supabase Configuration
 var supabaseUrl = builder.Configuration["Supabase:Url"];
@@ -423,6 +489,7 @@ if (!app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 app.Run();
 
