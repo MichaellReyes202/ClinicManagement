@@ -86,6 +86,17 @@ public class ChatController : BaseController
         {
             // El cliente desconectó la sesión SSE
         }
+        catch (Exception ex)
+        {
+            // Captura errores del modelo (ej. Ollama fuera de línea, HTTP 500/404 de IA, error de BD)
+            // y envía un evento SSE limpio en lugar de romper abruptamente la conexión TCP
+            var safeMessage = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                error = $"Error en el asistente de IA: {ex.Message}"
+            });
+            await Response.WriteAsync($"data: {safeMessage}\n\n", CancellationToken.None);
+            await Response.Body.FlushAsync(CancellationToken.None);
+        }
     }
 
     /// <summary>

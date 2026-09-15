@@ -56,8 +56,13 @@ public class ChatService : IChatService
             .AsNoTracking()
             .ToListAsync(ct);
 
-        int userSenderTypeId = senderTypes.FirstOrDefault(s => s.Name.Equals("Usuario", StringComparison.OrdinalIgnoreCase))?.Id ?? 1;
-        int assistantSenderTypeId = senderTypes.FirstOrDefault(s => s.Name.Equals("Asistente", StringComparison.OrdinalIgnoreCase))?.Id ?? 2;
+        int userSenderTypeId = senderTypes.FirstOrDefault(s => 
+            s.Name.Equals("Usuario", StringComparison.OrdinalIgnoreCase) || 
+            s.Name.Equals("User", StringComparison.OrdinalIgnoreCase))?.Id ?? 1;
+
+        int assistantSenderTypeId = senderTypes.FirstOrDefault(s => 
+            s.Name.Equals("Asistente", StringComparison.OrdinalIgnoreCase) || 
+            s.Name.Equals("Assistant", StringComparison.OrdinalIgnoreCase))?.Id ?? 2;
 
         // 3. Buscar o crear la conversación
         ChatConversation? conversation = null;
@@ -128,9 +133,12 @@ public class ChatService : IChatService
 
         string currentDateTimeStr = DateTime.Now.ToString("dd/MM/yyyy HH:mm:ss");
 
-        string systemPrompt = $@"Eres un asistente virtual especializado exclusivamente en la gestión clínica de la institución médica.
+                string systemPrompt = $@"Eres un asistente virtual especializado exclusivamente en la gestión clínica de la institución médica.
 
-REGLA DE ÁMBITO: Solo debes responder preguntas sobre el ámbito clínico y de gestión médica de la aplicación (citas, pacientes, consultas, exámenes, medicamentos, recetas, empleados y horarios de la clínica). Si el usuario solicita información sobre temas ajenos a la clínica (como deportes, juegos, cocina general, entretenimiento, etc.), declina amablemente la respuesta indicando que solo puedes asistir en la gestión clínica de la institución.
+REGLAS OBLIGATORIAS:
+1. ÁMBITO: Solo debes responder preguntas sobre el ámbito clínico y de gestión médica de la aplicación (citas, pacientes, consultas, exámenes, medicamentos, recetas, empleados y horarios de la clínica). Si el usuario solicita información sobre temas ajenos, declina amablemente.
+2. CAPACIDAD Y FORMATO DE TABLAS: TIENES TOTAL CAPACIDAD de estructurar la información en tablas utilizando sintaxis Markdown de GitHub (ejemplo: `| Nombre | DNI | Teléfono |`). Cuando el usuario solicite una lista, tabla o resumen, NUNCA digas que no puedes generar tablas; consulta la información necesaria mediante tus herramientas e imprímela directamente en una tabla Markdown clara y limpia.
+3. INVOCACIÓN DE HERRAMIENTAS: Utiliza las herramientas disponibles para consultar la base de datos antes de responder. NUNCA imprimas fragmentos JSON o etiquetas de invocación internas como `<tool_call>` o `brtc` en tu respuesta final.
 
 INFORMACIÓN DEL CONTEXTO ACTUAL:
 - Nombre del usuario: {userName}
@@ -205,6 +213,12 @@ Sé profesional, conciso y preciso en todas tus respuestas adaptadas a las respo
             {
                 if (!string.IsNullOrEmpty(chunk.Content))
                 {
+                    // Evitar transmitir marcas o JSONs crudos de invocación de herramientas
+                    if (IsToolCallMarkup(chunk.Content))
+                    {
+                        continue;
+                    }
+
                     assistantContentBuilder.Append(chunk.Content);
                     yield return chunk.Content;
                 }
@@ -242,14 +256,16 @@ Sé profesional, conciso y preciso en todas tus respuestas adaptadas a las respo
         {
             sw.Stop();
 
+            string cleanedContent = CleanAssistantContent(assistantContentBuilder.ToString());
+
             // 8. Persistir la respuesta del asistente (incluso si la petición fue cancelada)
-            if (assistantContentBuilder.Length > 0)
+            if (cleanedContent.Length > 0)
             {
                 var assistantMsg = new ChatMessage
                 {
                     ConversationId = conversation.Id,
                     SenderTypeId = assistantSenderTypeId,
-                    Content = assistantContentBuilder.ToString(),
+                    Content = cleanedContent,
                     TokensUsed = tokensUsed,
                     ExecutionTimeMs = (int)sw.ElapsedMilliseconds,
                     CreatedAt = DateTime.UtcNow
@@ -469,5 +485,42 @@ Sé profesional, conciso y preciso en todas tus respuestas adaptadas a las respo
 
         await _dbContext.SaveChangesAsync();
         return Result.Success();
+    }
+
+    private static bool IsToolCallMarkup(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        string t = text.Trim();
+        return t.StartsWith("<tool_call>", StringComparison.OrdinalIgnoreCase) ||
+               t.StartsWith("</tool_call>", StringComparison.OrdinalIgnoreCase) ||
+               t.StartsWith("brtc", StringComparison.OrdinalIgnoreCase) ||
+               t.StartsWith("[TOOL_CALLS]", StringComparison.OrdinalIgnoreCase) ||
+               t.Contains("ClinicPlugin-") ||
+               t.Contains("\"name\":");
+    }
+
+    private static string CleanAssistantContent(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content)) return content;
+
+        string cleaned = System.Text.RegularExpressions.Regex.Replace(
+            content,
+            @"<tool_call>.*?</tool_call>",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"brtc\s*\{.*?\}(\s*</tool_call>)?",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"\{\s*""name""\s*:\s*""ClinicPlugin-[^}]+\}",
+            "",
+            System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        return cleaned.Trim();
     }
 }

@@ -88,26 +88,34 @@ public class ClinicPlugin
         return JsonSerializer.Serialize(list);
     }
 
-    [KernelFunction, Description("Busca pacientes registrados en el sistema de la clínica por su nombre, apellido o número de DNI.")]
+    [KernelFunction, Description("Busca pacientes registrados en el sistema de la clínica por su nombre, apellido, número de DNI o devuelve la lista general si no se especifica un filtro exacto.")]
     public async Task<string> BuscarPacientes(
-        [Description("Nombre, apellido o número de DNI del paciente a buscar.")] string terminoBusqueda)
+        [Description("Nombre, apellido o número de DNI del paciente a buscar. Puede dejarse vacío o usar 'todos' para listar pacientes.")] string? terminoBusqueda = null)
     {
         if (!IsAuthenticated())
         {
             return "Acceso denegado: El usuario debe estar autenticado para buscar pacientes.";
         }
 
-        if (string.IsNullOrWhiteSpace(terminoBusqueda))
+        string? queryParam = null;
+        if (!string.IsNullOrWhiteSpace(terminoBusqueda))
         {
-            return "Debe ingresar un término de búsqueda válido (nombre, apellido o DNI).";
+            string term = terminoBusqueda.Trim().ToLowerInvariant();
+            if (!term.Equals("todos") && 
+                !term.Equals("registrados") && 
+                !term.Equals("recientes") && 
+                !term.Equals(DateTime.Now.Year.ToString()))
+            {
+                queryParam = terminoBusqueda.Trim();
+            }
         }
 
         using var scope = _scopeFactory.CreateScope();
         var patientServices = scope.ServiceProvider.GetRequiredService<IPatientServices>();
 
-        var pagination = new PaginationDto(20, 0)
+        var pagination = new PaginationDto(25, 0)
         {
-            Query = terminoBusqueda.Trim()
+            Query = queryParam
         };
 
         var result = await patientServices.SearchPatient(pagination);
@@ -126,7 +134,9 @@ public class ClinicPlugin
 
         if (!patients.Any())
         {
-            return $"No se encontraron pacientes que coincidan con '{terminoBusqueda}'.";
+            return string.IsNullOrWhiteSpace(queryParam) 
+                ? "No se encontraron pacientes registrados en el sistema." 
+                : $"No se encontraron pacientes que coincidan con '{terminoBusqueda}'.";
         }
 
         return JsonSerializer.Serialize(patients);
