@@ -19,7 +19,7 @@ public class MedicationController : BaseController
   }
 
   [HttpGet("search")]
-  [Authorize]
+  [Authorize(Policy = "RequireMedicationReadView")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status500InternalServerError)]
   public async Task<IActionResult> Search([FromQuery] string query)
@@ -30,7 +30,7 @@ public class MedicationController : BaseController
   }
 
   [HttpGet]
-  [Authorize]
+  [Authorize(Policy = "RequireMedicationReadView")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   public async Task<IActionResult> GetAll([FromQuery] PaginationDto pagination)
   {

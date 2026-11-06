@@ -27,19 +27,20 @@ public class ClinicPlugin
         _httpContextAccessor = httpContextAccessor;
     }
 
-    private bool IsAuthenticated()
+    private bool HasAnyView(params string[] viewNames)
     {
         var user = _httpContextAccessor.HttpContext?.User;
-        return user?.Identity?.IsAuthenticated == true;
+        return user?.Identity?.IsAuthenticated == true &&
+               viewNames.Any(viewName => user.HasClaim("view", viewName));
     }
 
     [KernelFunction, Description("Obtiene la lista de citas médicas agendadas para el día de hoy o para una fecha específica. Permite al personal y doctores consultar la agenda.")]
     public async Task<string> ObtenerCitasDelDia(
         [Description("Fecha a consultar en formato YYYY-MM-DD (ejemplo: 2026-09-14). Opcional, si no se especifica se consulta la fecha actual.")] string? fecha = null)
     {
-        if (!IsAuthenticated())
+        if (!HasAnyView("Citas - Hoy", "Citas - Agendar", "Consultas - Activa", "Consultas - Historial"))
         {
-            return "Acceso denegado: El usuario debe estar autenticado en la plataforma clínica para consultar la agenda de citas.";
+            return "Acceso denegado: No tienes permisos para consultar citas.";
         }
 
         DateTime? parsedDate = null;
@@ -48,10 +49,6 @@ public class ClinicPlugin
             if (DateTime.TryParseExact(fecha.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var dt))
             {
                 parsedDate = dt;
-            }
-            else if (DateTime.TryParse(fecha, out var dtAny))
-            {
-                parsedDate = dtAny;
             }
             else
             {
@@ -88,23 +85,28 @@ public class ClinicPlugin
         return JsonSerializer.Serialize(list);
     }
 
-    [KernelFunction, Description("Busca pacientes registrados en el sistema de la clínica por su nombre, apellido, número de DNI o devuelve la lista general si no se especifica un filtro exacto.")]
+    [KernelFunction, Description("Busca pacientes por nombre o DNI, lista pacientes o consulta los más recientemente agregados. Cuando soliciten los últimos pacientes registrados, indica 'recientes' en terminoBusqueda; los resultados se ordenan por fecha de registro descendente.")]
     public async Task<string> BuscarPacientes(
-        [Description("Nombre, apellido o número de DNI del paciente a buscar. Puede dejarse vacío o usar 'todos' para listar pacientes.")] string? terminoBusqueda = null)
+        [Description("Nombre, apellido o DNI para buscar. Usa 'todos' para listar, o 'recientes'/'últimos agregados' para obtener los registros más nuevos primero.")] string? terminoBusqueda = null)
     {
-        if (!IsAuthenticated())
+        if (!HasAnyView(
+                "Pacientes - Buscar", "Pacientes - Registrar", "Pacientes - Historial de Paciente",
+                "Consultas - Activa", "Consultas - Crear", "Consultas - Historial", "Citas - Agendar"))
         {
-            return "Acceso denegado: El usuario debe estar autenticado para buscar pacientes.";
+            return "Acceso denegado: No tienes permisos para consultar pacientes.";
         }
 
         string? queryParam = null;
+        bool recentSearch = false;
         if (!string.IsNullOrWhiteSpace(terminoBusqueda))
         {
             string term = terminoBusqueda.Trim().ToLowerInvariant();
-            if (!term.Equals("todos") && 
-                !term.Equals("registrados") && 
-                !term.Equals("recientes") && 
-                !term.Equals(DateTime.Now.Year.ToString()))
+            recentSearch = term.Contains("reciente") || term.Contains("último") ||
+                           term.Contains("ultimo") || term.Contains("nuevo") ||
+                           term.Contains("agregado") || term.Contains("agregados");
+
+            bool allPatients = term.Equals("todos") || term.Equals("registrados");
+            if (!recentSearch && !allPatients)
             {
                 queryParam = terminoBusqueda.Trim();
             }
@@ -113,12 +115,14 @@ public class ClinicPlugin
         using var scope = _scopeFactory.CreateScope();
         var patientServices = scope.ServiceProvider.GetRequiredService<IPatientServices>();
 
-        var pagination = new PaginationDto(25, 0)
+        var pagination = new PaginationDto(20, 0)
         {
             Query = queryParam
         };
 
-        var result = await patientServices.SearchPatient(pagination);
+        var result = recentSearch
+            ? await patientServices.GetRecentPatients(pagination)
+            : await patientServices.SearchPatient(pagination);
         if (result.IsFailure || result.Value == null || result.Value.Items == null)
         {
             return $"No se encontraron pacientes: {result.Error?.Description ?? "Sin coincidencias."}";
@@ -128,8 +132,7 @@ public class ClinicPlugin
         {
             p.Id,
             Paciente = p.FullName,
-            p.Dni,
-            Telefono = p.ContactPhone
+            FechaRegistro = p.CreatedAt
         }).ToList();
 
         if (!patients.Any())
@@ -145,9 +148,9 @@ public class ClinicPlugin
     [KernelFunction, Description("Obtiene los horarios generales de apertura y cierre de la clínica para los días de la semana.")]
     public async Task<string> ObtenerHorariosClinica()
     {
-        if (!IsAuthenticated())
+        if (!HasAnyView("Administración - Horarios", "Citas - Agendar", "Citas - Disponibilidad"))
         {
-            return "Acceso denegado: Se requiere una sesión activa en la clínica.";
+            return "Acceso denegado: No tienes permisos para consultar los horarios.";
         }
 
         using var scope = _scopeFactory.CreateScope();

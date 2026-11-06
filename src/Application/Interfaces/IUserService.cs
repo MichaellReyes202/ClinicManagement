@@ -10,6 +10,7 @@ namespace Application.Interfaces
     {
         // metodod para obtener el usuario que esta logueado
         Task<User?> GetCurrentUserAsync();
+        Task<User?> GetCurrentUserWithEmployeeAsync();
 
         // obtener todos los usuarios
         Task<Result<PaginatedResponseDto<UserListDto>>> GetAllUsersAsync(PaginationDto pagination);

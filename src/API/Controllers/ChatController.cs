@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Logging;
 
 namespace API.Controllers;
 
@@ -19,10 +20,12 @@ namespace API.Controllers;
 public class ChatController : BaseController
 {
     private readonly IChatService _chatService;
+    private readonly ILogger<ChatController> _logger;
 
-    public ChatController(IChatService chatService)
+    public ChatController(IChatService chatService, ILogger<ChatController> logger)
     {
         _chatService = chatService;
+        _logger = logger;
     }
 
     private int GetCurrentUserId()
@@ -65,21 +68,31 @@ public class ChatController : BaseController
             return;
         }
 
-        Response.ContentType = "text/event-stream";
+        if (string.IsNullOrWhiteSpace(dto.Message))
+        {
+            Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        Response.ContentType = "text/event-stream; charset=utf-8";
         Response.Headers.Append("Cache-Control", "no-cache");
         Response.Headers.Append("Connection", "keep-alive");
         Response.Headers.Append("X-Accel-Buffering", "no");
 
         try
         {
-            await foreach (var chunk in _chatService.SendMessageStreamAsync(userId, roleId, dto, ct))
+            await foreach (var streamEvent in _chatService.SendMessageStreamAsync(userId, roleId, dto, ct))
             {
-                var formattedData = chunk.Replace("\n", "\\n");
-                await Response.WriteAsync($"data: {formattedData}\n\n", ct);
+                await WriteStreamEventAsync(streamEvent, ct);
                 await Response.Body.FlushAsync(ct);
+
+                if (streamEvent.Type == "error")
+                {
+                    return;
+                }
             }
 
-            await Response.WriteAsync("data: [DONE]\n\n", ct);
+            await WriteStreamEventAsync(new ChatStreamEventDto { Type = "done" }, ct);
             await Response.Body.FlushAsync(ct);
         }
         catch (OperationCanceledException)
@@ -88,15 +101,25 @@ public class ChatController : BaseController
         }
         catch (Exception ex)
         {
-            // Captura errores del modelo (ej. Ollama fuera de línea, HTTP 500/404 de IA, error de BD)
-            // y envía un evento SSE limpio en lugar de romper abruptamente la conexión TCP
-            var safeMessage = System.Text.Json.JsonSerializer.Serialize(new
+            _logger.LogError(ex, "Error procesando streaming de chat para el usuario {UserId}", userId);
+            if (!ct.IsCancellationRequested)
             {
-                error = $"Error en el asistente de IA: {ex.Message}"
-            });
-            await Response.WriteAsync($"data: {safeMessage}\n\n", CancellationToken.None);
-            await Response.Body.FlushAsync(CancellationToken.None);
+                await WriteStreamEventAsync(new ChatStreamEventDto
+                {
+                    Type = "error",
+                    Message = "No se pudo completar la respuesta. Intenta nuevamente."
+                }, CancellationToken.None);
+                await Response.Body.FlushAsync(CancellationToken.None);
+            }
         }
+    }
+
+    private Task WriteStreamEventAsync(ChatStreamEventDto streamEvent, CancellationToken ct)
+    {
+        var data = System.Text.Json.JsonSerializer.Serialize(
+            streamEvent,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+        return Response.WriteAsync($"data: {data}\n\n", ct);
     }
 
     /// <summary>

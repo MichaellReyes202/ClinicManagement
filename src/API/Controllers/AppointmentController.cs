@@ -20,7 +20,7 @@ public class AppointmentController : BaseController
   }
 
   [HttpGet("{id:int}", Name = "GetAppointment")]
-  [Authorize]
+  [Authorize(Policy = "RequireAppointmentReadView")]
   public async Task<ActionResult<AppointmentDetailDto>> GetAppointment(int id)
   {
     var result = await _appointmentServices.GetById(id);
@@ -30,7 +30,7 @@ public class AppointmentController : BaseController
 
 
   [HttpPut("updateStatus")]
-  [Authorize]
+  [Authorize(Policy = "RequireAppointmentsStatusView")]
   public async Task<IActionResult> UpdateStatusAppointments([FromBody] UpdateStatusAppointmenDto dto)
   {
     var result = await _appointmentServices.UpdateStatusAppointmentsAsync(dto);
@@ -38,7 +38,7 @@ public class AppointmentController : BaseController
   }
 
   [HttpGet("doctorsAvailability")]
-  [Authorize]
+  [Authorize(Policy = "RequireAppointmentsAvailabilityView")]
   public async Task<ActionResult<List<DoctorAvailabilityDto>>> DoctorAvailabilityAsync([FromQuery] int? specialtyId = null)
   {
     var result = await _appointmentServices.GetDoctorAvailabilityAsync(specialtyId);
@@ -46,7 +46,7 @@ public class AppointmentController : BaseController
   }
 
   [HttpGet("today")]
-  [Authorize]
+  [Authorize(Policy = "RequireAppointmentsTodayView")]
   public async Task<ActionResult<List<TodayAppointmentDto>>> GetTodayAppointments([FromQuery] DateTime? date = null)
   {
     var result = await _appointmentServices.GetTodayAppointmentsAsync(date);
@@ -55,7 +55,7 @@ public class AppointmentController : BaseController
 
 
   [HttpGet("list")]
-  [Authorize]
+  [Authorize(Policy = "RequireAppointmentReadView")]
   public async Task<ActionResult<List<AppointmentListDto>>> GetListAsync([FromQuery] AppointmentFilterDto filter)
   {
     var result = await _appointmentServices.GetListAsync(filter);
@@ -64,7 +64,7 @@ public class AppointmentController : BaseController
 
 
   [HttpPost("createAppointment")]
-  [Authorize]
+  [Authorize(Policy = "RequireAppointmentsScheduleView")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -76,7 +76,7 @@ public class AppointmentController : BaseController
   }
 
   [HttpPut("{Id:int}")]
-  [Authorize]
+  [Authorize(Policy = "RequireAppointmentReadView")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -89,7 +89,7 @@ public class AppointmentController : BaseController
 
   }
   [HttpDelete("{id:int}")]
-  [Authorize]
+  [Authorize(Policy = "RequireAppointmentsScheduleView")]
   public async Task<IActionResult> Delete(int id)
   {
     var result = await _appointmentServices.Delete(id);

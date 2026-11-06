@@ -13,14 +13,30 @@ namespace API.Controllers
   public class EmployesController : BaseController
   {
     private readonly IEmployesServices _employesServices;
+    private readonly IUserService _userService;
 
-    public EmployesController(IEmployesServices employesServices)
+    public EmployesController(IEmployesServices employesServices, IUserService userService)
     {
       _employesServices = employesServices;
+      _userService = userService;
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<ActionResult<EmployeReponseDto>> GetCurrentEmployee()
+    {
+      var currentUser = await _userService.GetCurrentUserWithEmployeeAsync();
+      if (currentUser?.EmployeeUser == null)
+      {
+        return NotFound();
+      }
+
+      var result = await _employesServices.GetEmployeeById(currentUser.EmployeeUser.Id);
+      return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
     }
 
     [HttpGet("search")]
-    [Authorize]
+    [Authorize(Policy = "RequireEmployeeReadView")]
     public async Task<IActionResult> SearchEmployees([FromQuery] PaginationDto pagination)
     {
       var result = await _employesServices.EmployeesWithoutUsers(pagination);
@@ -32,7 +48,7 @@ namespace API.Controllers
       }) : HandleFailure(result);
     }
     [HttpGet]
-    [Authorize]
+    [Authorize(Policy = "RequireEmployeeReadView")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> Get([FromQuery] PaginationDto pagination)
@@ -49,6 +65,7 @@ namespace API.Controllers
 
     // obtener el empleador por el id 
     [HttpGet("{id:int}", Name = "GetEmployee")]
+    [Authorize(Policy = "RequireEmployeeReadView")]
     public async Task<ActionResult<EmployeReponseDto>> Get(int Id)
     {
       var result = await _employesServices.GetEmployeeById(Id);
@@ -56,7 +73,7 @@ namespace API.Controllers
     }
 
 
-    [Authorize]
+    [Authorize(Policy = "RequireHREmployeesView")]
     [HttpPost("createEmployes")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -70,7 +87,7 @@ namespace API.Controllers
     }
 
     [HttpPut("{Id:int}")]
-    [Authorize]
+    [Authorize(Policy = "RequireHREmployeesView")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

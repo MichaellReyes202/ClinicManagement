@@ -2,6 +2,8 @@ using Application.DTOs.Appointment;
 using Domain.Entities;
 using Domain.Interfaces;
 using FluentValidation;
+using Application.Util;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Threading;
@@ -12,10 +14,14 @@ namespace Application.Validators.Appointment
     public class AppointmentCreateDtoValidator : AbstractValidator<AppointmentCreateDto>
     {
         private readonly IGenericRepository<ClinicSchedule> _clinicScheduleRepo;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public AppointmentCreateDtoValidator(IGenericRepository<ClinicSchedule> clinicScheduleRepo)
+        public AppointmentCreateDtoValidator(
+            IGenericRepository<ClinicSchedule> clinicScheduleRepo,
+            IHttpContextAccessor httpContextAccessor)
         {
             _clinicScheduleRepo = clinicScheduleRepo;
+            _httpContextAccessor = httpContextAccessor;
 
             RuleFor(x => x.PatientId)
                 .GreaterThan(0)
@@ -32,8 +38,8 @@ namespace Application.Validators.Appointment
             // StartTime: Validaciones básicas
             RuleFor(x => x.StartTime)
                 .NotEmpty().WithMessage("The start date and time are required.")
-                // Relaxed check: Allow up to 10 minutes in the past to account for clock drift
-                .GreaterThanOrEqualTo(x => DateTime.Now.AddMinutes(-10))
+                // Allow up to 10 minutes in the past to account for clock drift, using the clinic's request timezone.
+                .Must(NotBeInThePast)
                 .WithMessage("Appointments cannot be scheduled in the past.")
                 .MustAsync(BeWithinClinicBusinessHoursAsync)
                 .WithMessage("The start time must be within the clinic's business hours.");
@@ -43,6 +49,15 @@ namespace Application.Validators.Appointment
                 .MustAsync(BeWithinWorkingDayAsync)
                 .WithMessage("The appointment must start and end within the clinic's business hours on the same day.")
                 .OverridePropertyName("Duration");
+        }
+
+        private bool NotBeInThePast(DateTime startTime)
+        {
+            var timeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
+            var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+            var localStart = DateTime.SpecifyKind(startTime, DateTimeKind.Unspecified);
+            var localCutoff = DateTime.SpecifyKind(localNow.AddMinutes(-10), DateTimeKind.Unspecified);
+            return localStart >= localCutoff;
         }
 
         private async Task<bool> BeWithinClinicBusinessHoursAsync(DateTime startTime, CancellationToken cancellationToken)

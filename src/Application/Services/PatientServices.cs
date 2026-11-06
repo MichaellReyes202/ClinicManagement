@@ -64,6 +64,7 @@ public class PatientServices : IPatientServices
         {
           Id = e.Id,
           FullName = (e.FirstName + " " + (e.MiddleName != null ? e.MiddleName + " " : "") + e.LastName + " " + (e.SecondLastName != null ? e.SecondLastName : "")).Trim(),
+          CreatedAt = e.CreatedAt,
           Dni = e.Dni ?? string.Empty,
           ContactPhone = e.ContactPhone ?? string.Empty,
         });
@@ -74,6 +75,27 @@ public class PatientServices : IPatientServices
 
     var paginatedResponse = new PaginatedResponseDto<PatientSearchDto>(total, items, pagination.Limit);
     return Result<PaginatedResponseDto<PatientSearchDto>>.Success(paginatedResponse);
+  }
+
+  public async Task<Result<PaginatedResponseDto<PatientSearchDto>>> GetRecentPatients(PaginationDto pagination)
+  {
+    var (baseQuery, total) = await _patientRepository.GetQueryAndTotal();
+    var items = await baseQuery
+        .AsNoTracking()
+        .OrderByDescending(patient => patient.CreatedAt)
+        .ThenByDescending(patient => patient.Id)
+        .Skip(pagination.Offset)
+        .Take(pagination.Limit)
+        .Select(patient => new PatientSearchDto
+        {
+          Id = patient.Id,
+          FullName = (patient.FirstName + " " + (patient.MiddleName != null ? patient.MiddleName + " " : "") + patient.LastName + " " + (patient.SecondLastName != null ? patient.SecondLastName : "")).Trim(),
+          CreatedAt = patient.CreatedAt
+        })
+        .ToListAsync();
+
+    var response = new PaginatedResponseDto<PatientSearchDto>(total, items, pagination.Limit);
+    return Result<PaginatedResponseDto<PatientSearchDto>>.Success(response);
   }
 
   public async Task<Result<PaginatedResponseDto<PatientResponseDto>>> GetAllPatients(PaginationDto pagination)

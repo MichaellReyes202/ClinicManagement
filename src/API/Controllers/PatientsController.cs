@@ -21,7 +21,7 @@ public class PatientsController : BaseController
     _patientServices = patientServices;
   }
   [HttpGet]
-  [Authorize]
+  [Authorize(Policy = "RequirePatientReadView")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status500InternalServerError)]
   public async Task<IActionResult> Get([FromQuery] PaginationDto pagination)
@@ -36,7 +36,7 @@ public class PatientsController : BaseController
   }
 
   [HttpGet("search")]
-  [Authorize]
+  [Authorize(Policy = "RequirePatientsSearchView")]
   public async Task<IActionResult> Search([FromQuery] PaginationDto pagination)
   {
     var result = await _patientServices.SearchPatient(pagination);
@@ -48,7 +48,7 @@ public class PatientsController : BaseController
     }) : HandleFailure(result);
   }
 
-  [Authorize]
+  [Authorize(Policy = "RequirePatientsRegisterView")]
   [HttpPost("createPatient")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -62,7 +62,7 @@ public class PatientsController : BaseController
 
   // obtener el empleador por el id 
   [HttpGet("{id:int}", Name = "GetPatient")]
-  [Authorize]
+  [Authorize(Policy = "RequirePatientReadView")]
   public async Task<ActionResult<EmployeReponseDto>> Get(int Id)
   {
     var result = await _patientServices.GetPatientById(Id);
@@ -70,7 +70,7 @@ public class PatientsController : BaseController
   }
 
   [HttpPut("{Id:int}")]
-  [Authorize]
+  [Authorize(Policy = "RequirePatientsRegisterView")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status409Conflict)]

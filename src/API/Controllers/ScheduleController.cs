@@ -32,7 +32,7 @@ namespace API.Controllers
 
         /// <summary>PUT /api/schedules/clinic/{id} — Actualiza un día del horario de la clínica.</summary>
         [HttpPut("clinic/{id:int}")]
-        [Authorize(Policy = "RequireAdministrationView")]
+        [Authorize(Policy = "RequireAdminSchedulesView")]
         [ProducesResponseType(typeof(ClinicScheduleDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -46,6 +46,7 @@ namespace API.Controllers
 
         /// <summary>GET /api/schedules/employee/{employeeId} — Obtiene los días configurados para un doctor.</summary>
         [HttpGet("employee/{employeeId:int}")]
+        [Authorize(Policy = "RequireEmployeeReadView")]
         [ProducesResponseType(typeof(List<EmployeeScheduleDto>), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetEmployeeSchedules(int employeeId)
@@ -56,7 +57,7 @@ namespace API.Controllers
 
         /// <summary>PUT /api/schedules/employee/{employeeId}/day — Crea o actualiza el horario de un doctor para un día.</summary>
         [HttpPut("employee/{employeeId:int}/day")]
-        [Authorize(Policy = "RequireAdministrationView")]
+        [Authorize(Policy = "RequireAdminSchedulesView")]
         [ProducesResponseType(typeof(EmployeeScheduleDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -68,7 +69,7 @@ namespace API.Controllers
 
         /// <summary>PUT /api/schedules/employee/{employeeId}/duration — Actualiza la duración estándar de cita de un doctor.</summary>
         [HttpPut("employee/{employeeId:int}/duration")]
-        [Authorize(Policy = "RequireAdministrationView")]
+        [Authorize(Policy = "RequireAdminSchedulesView")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]

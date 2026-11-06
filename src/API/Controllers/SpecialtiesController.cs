@@ -22,7 +22,7 @@ public class SpecialtiesController : BaseController
   }
 
   [HttpGet]
-  [Authorize]
+  [Authorize(Policy = "RequireHRSpecialtiesView")]
   public async Task<ActionResult<Result<PaginatedResponseDto<SpecialtyListDto>>>> Get([FromQuery] PaginationDto pagination)
   {
     var result = await _specialtiesServices.GetAllSpecialties(pagination);
@@ -31,7 +31,7 @@ public class SpecialtiesController : BaseController
 
 
   [HttpGet("examsBySpecialty")]
-  [Authorize]
+  [Authorize(Policy = "RequireSpecialtyReadView")]
   public async Task<ActionResult<Result<PaginatedResponseDto<SpecialtyListDto>>>> ExamsBySpecialty([FromQuery] PaginationDto pagination)
   {
     var result = await _specialtiesServices.GetExamsBySpecialty(pagination);
@@ -42,7 +42,7 @@ public class SpecialtiesController : BaseController
 
 
   [HttpGet("doctorsBySpecialty")]
-  [Authorize]
+  [Authorize(Policy = "RequireSpecialtyReadView")]
   public async Task<ActionResult<List<DoctorBySpecialtyDto>>> DoctorsBySpecialty([FromQuery] PaginationDto pagination)
   {
     var result = await _specialtiesServices.GetDoctorBySpecialty(pagination);
@@ -50,13 +50,14 @@ public class SpecialtiesController : BaseController
   }
 
   [HttpGet("listOption")]
+  [Authorize(Policy = "RequireSpecialtyReadView")]
   public async Task<ActionResult<List<OptionDto>>> GetListOption()
   {
     return await _specialtiesServices.GetAllSpecialtiesOptions();
   }
 
   [HttpPost("create")]
-  [Authorize]
+  [Authorize(Policy = "RequireHRSpecialtiesView")]
   [ProducesResponseType(typeof(Specialty), StatusCodes.Status201Created)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -68,6 +69,7 @@ public class SpecialtiesController : BaseController
   }
 
   [HttpGet("{id}")]
+  [Authorize(Policy = "RequireHRSpecialtiesView")]
   [ProducesResponseType(typeof(Specialty), StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -78,6 +80,7 @@ public class SpecialtiesController : BaseController
   }
 
   [HttpPut("{id:int}")]
+  [Authorize(Policy = "RequireHRSpecialtiesView")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status404NotFound)]

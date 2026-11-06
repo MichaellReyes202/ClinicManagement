@@ -14,7 +14,7 @@ namespace API.Controllers;
 
 [ApiController]
 [Route("api/permissions")]
-[Authorize(Policy = "RequireAdministrationView")]
+[Authorize(Policy = "RequireAdminUsersView")]
 public class PermissionsController : ControllerBase
 {
     private readonly ClinicDbContext _context;

@@ -22,7 +22,7 @@ public class ExamTypeController : BaseController
     _examTypeServices = examTypeServices;
   }
   [HttpGet]
-  [Authorize]
+  [Authorize(Policy = "RequireLabCatalogView")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status500InternalServerError)]
   public async Task<IActionResult> Get([FromQuery] PaginationDto pagination)
@@ -36,7 +36,7 @@ public class ExamTypeController : BaseController
     }) : HandleFailure(result);
   }
 
-  [Authorize]
+  [Authorize(Policy = "RequireLabCatalogView")]
   [HttpPost("createExamType")]
   [ProducesResponseType(StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -50,7 +50,7 @@ public class ExamTypeController : BaseController
 
 
   [HttpGet("{id:int}", Name = "GetExamType")]
-  [Authorize]
+  [Authorize(Policy = "RequireLabCatalogView")]
   public async Task<ActionResult<EmployeReponseDto>> GetExamType(int Id)
   {
     var result = await _examTypeServices.GetById(Id);
@@ -58,7 +58,7 @@ public class ExamTypeController : BaseController
   }
 
   [HttpPut("{Id:int}")]
-  [Authorize]
+  [Authorize(Policy = "RequireLabCatalogView")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -73,7 +73,7 @@ public class ExamTypeController : BaseController
 
   // Activate or deactivate an exam type
   [HttpPut("{Id:int}/activate")]
-  [Authorize]
+  [Authorize(Policy = "RequireLabCatalogView")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status409Conflict)]

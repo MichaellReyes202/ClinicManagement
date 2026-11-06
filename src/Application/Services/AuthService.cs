@@ -17,6 +17,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Caching.Memory;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 
@@ -371,8 +372,8 @@ public class AuthService : IAuthService
     var expiration = DateTime.UtcNow.AddDays(1);
 
     var tokenDeSeguridad = new JwtSecurityToken(
-         issuer: null,// jwtSettings["Issuer"],
-         audience: null, // jwtSettings["Audience"],
+         issuer: jwtSettings["Issuer"],
+         audience: jwtSettings["Audience"],
          claims: claims,
          notBefore: DateTime.UtcNow,
          expires: expiration,
@@ -495,9 +496,9 @@ public class AuthService : IAuthService
       return Result<bool>.Failure(new Error(ErrorCodes.Conflict, "El empleado no tiene correo personal registrado. Registre uno para poder restablecer la contraseña."));
 
     // 4. Generar y guardar código en caché (igual que ForgotPassword)
-    var random = new Random();
-    var code = random.Next(100000, 999999).ToString();
+    var code = GeneratePasswordResetCode();
     _memoryCache.Set($"pwd_reset_{targetUser.Email}", code, TimeSpan.FromMinutes(5));
+    _memoryCache.Set($"pwd_reset_attempts_{targetUser.Email}", 0, TimeSpan.FromMinutes(5));
 
     // 5. Enviar correo de recuperación al correo personal del empleado
     var resetLink = $"{_configuration["FrontendUrl"] ?? "http://localhost:5173"}/auth/reset-password?email={targetUser.Email}";
@@ -602,14 +603,22 @@ public class AuthService : IAuthService
 
     if (user.EmployeeUser == null || string.IsNullOrEmpty(user.EmployeeUser.Email))
     {
-      return Result<bool>.Failure(new Error(ErrorCodes.Conflict, "No hay un correo personal registrado. Contacte al administrador."));
+      // Mantener una respuesta genérica evita confirmar si una cuenta existe.
+      return Result<bool>.Success(true);
     }
 
-    var random = new Random();
-    var code = random.Next(100000, 999999).ToString();
+    var cooldownKey = $"pwd_reset_cooldown_{user.Email}";
+    if (_memoryCache.TryGetValue(cooldownKey, out _))
+    {
+      return Result<bool>.Success(true);
+    }
+
+    var code = GeneratePasswordResetCode();
 
     // Guardar en cache por 5 minutos
     _memoryCache.Set($"pwd_reset_{user.Email}", code, TimeSpan.FromMinutes(5));
+    _memoryCache.Set($"pwd_reset_attempts_{user.Email}", 0, TimeSpan.FromMinutes(5));
+    _memoryCache.Set(cooldownKey, true, TimeSpan.FromMinutes(1));
 
     try{
       var subject = "Código de recuperación de contraseña - Clínica Oficentro";
@@ -637,6 +646,9 @@ public class AuthService : IAuthService
 
     return Result<bool>.Success(true);
     } catch(Exception ex){
+      _memoryCache.Remove($"pwd_reset_{user.Email}");
+      _memoryCache.Remove($"pwd_reset_attempts_{user.Email}");
+      _memoryCache.Remove(cooldownKey);
       // Log de error técnico en el envío
       await _auditlogServices.RegisterActionAsync(
         userId: user.Id,
@@ -657,8 +669,23 @@ public class AuthService : IAuthService
     if (user == null)
       return Result<bool>.Failure(new Error(ErrorCodes.NotFound, "User not found"));
 
+    var attemptsKey = $"pwd_reset_attempts_{user.Email}";
+    _memoryCache.TryGetValue<int>(attemptsKey, out var failedAttempts);
+    if (failedAttempts >= 5)
+    {
+      _memoryCache.Remove($"pwd_reset_{user.Email}");
+      return Result<bool>.Failure(new Error(ErrorCodes.Unauthorized, "El código es inválido o ha expirado."));
+    }
+
     if (!_memoryCache.TryGetValue($"pwd_reset_{user.Email}", out string? savedCode) || savedCode != dto.Code)
     {
+      failedAttempts++;
+      _memoryCache.Set(attemptsKey, failedAttempts, TimeSpan.FromMinutes(5));
+      if (failedAttempts >= 5)
+      {
+        _memoryCache.Remove($"pwd_reset_{user.Email}");
+      }
+
       await _auditlogServices.RegisterActionAsync(
         userId: user.Id,
         module: AuditModuletype.Auth,
@@ -677,6 +704,7 @@ public class AuthService : IAuthService
     if (result.Succeeded)
     {
       _memoryCache.Remove($"pwd_reset_{user.Email}");
+      _memoryCache.Remove(attemptsKey);
       user.RequiresPasswordChange = false;
       await _userRepository.UpdateAsync(user);
       await _userRepository.SaveChangesAsync();
@@ -698,4 +726,7 @@ public class AuthService : IAuthService
     var errors = result.Errors.Select(e => new ValidationError(string.Empty, e.Description)).ToList();
     return Result<bool>.Failure(errors);
   }
+
+  private static string GeneratePasswordResetCode() =>
+    RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 }

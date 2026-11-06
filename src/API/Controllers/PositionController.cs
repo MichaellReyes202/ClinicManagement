@@ -25,7 +25,7 @@ public class PositionController : BaseController
   }
 
   [HttpGet]
-  [Authorize]
+  [Authorize(Policy = "RequireHRPositionsView")]
   public async Task<ActionResult<Result<PaginatedResponseDto<PositionListDto>>>> Get([FromQuery] PaginationDto pagination)
   {
     var result = await _positionServices.GetAllPosition(pagination);
@@ -33,13 +33,14 @@ public class PositionController : BaseController
   }
 
   [HttpGet("listOption")]
+  [Authorize(Policy = "RequirePositionReadView")]
   public async Task<ActionResult<List<OptionDto>>> GetListOption()
   {
     return await _positionServices.GetAllPositionOptions();
   }
 
   [HttpPost("create")]
-  [Authorize]
+  [Authorize(Policy = "RequireHRPositionsView")]
   [ProducesResponseType(typeof(Specialty), StatusCodes.Status201Created)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -51,6 +52,7 @@ public class PositionController : BaseController
   }
 
   [HttpGet("{id}")]
+  [Authorize(Policy = "RequireHRPositionsView")]
   [ProducesResponseType(typeof(Position), StatusCodes.Status200OK)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -61,6 +63,7 @@ public class PositionController : BaseController
   }
 
   [HttpPut("{id:int}")]
+  [Authorize(Policy = "RequireHRPositionsView")]
   [ProducesResponseType(StatusCodes.Status204NoContent)]
   [ProducesResponseType(StatusCodes.Status400BadRequest)]
   [ProducesResponseType(StatusCodes.Status404NotFound)]

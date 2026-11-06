@@ -6,6 +6,7 @@ namespace Application.Interfaces;
 public interface IConsultationServices
 {
     Task<Result<int>> StartConsultationAsync(int appointmentId);
+    Task<Result<StartWalkInConsultationResponseDto>> StartWalkInConsultationAsync(StartWalkInConsultationDto dto);
     Task<Result> FinishConsultationAsync(FinishConsultationDto dto);
     Task<Result> RollbackConsultationAsync(int consultationId);
     Task<Result<ConsultationDetailDto>> GetConsultationByAppointmentIdAsync(int appointmentId);

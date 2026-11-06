@@ -169,9 +169,9 @@ public class AppointmentServices : IAppointmentServices
     var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
     var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, userTimeZone);
 
-    // Si viene fecha, usamos esa convertida a local. Si no, usamos la fecha actual local.
+    // Las fechas recibidas representan el día calendario local solicitado, no un instante UTC.
     var localDate = date.HasValue
-        ? TimeZoneInfo.ConvertTimeFromUtc(date.Value, userTimeZone)
+        ? date.Value.Date
         : localNow;
 
     var localTodayStart = localDate.Date;

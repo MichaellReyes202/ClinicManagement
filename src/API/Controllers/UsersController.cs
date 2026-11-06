@@ -9,6 +9,7 @@ namespace API.Controllers
 {
   [ApiController]
   [Route("api/users")]
+  [Authorize(Policy = "RequireAdminUsersView")]
   public class UsersController : BaseController
   {
     private readonly IUserService _userService;
@@ -18,7 +19,6 @@ namespace API.Controllers
       this._userService = userService;
     }
     [HttpGet]
-    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> GetAllUsers([FromQuery] PaginationDto pagination)

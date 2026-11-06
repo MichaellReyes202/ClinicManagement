@@ -16,6 +16,7 @@ namespace API.Controllers
 {
   [ApiController]
   [Route("api/roles")]
+  [Authorize(Policy = "RequireAdminUsersView")]
   public class RoleController : BaseController
   {
     private readonly IRoleService _roleService;

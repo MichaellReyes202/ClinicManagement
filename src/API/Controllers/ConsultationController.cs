@@ -21,13 +21,23 @@ public class ConsultationController : BaseController
   }
 
   [HttpPost("start")]
+  [Authorize(Policy = "RequireConsultationsStartView")]
   public async Task<IActionResult> StartConsultation([FromBody] StartConsultationDto dto)
   {
     var result = await _consultationServices.StartConsultationAsync(dto.AppointmentId);
     return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
   }
 
+  [HttpPost("start-walk-in")]
+  [Authorize(Policy = "RequireConsultationsStartView")]
+  public async Task<IActionResult> StartWalkInConsultation([FromBody] StartWalkInConsultationDto dto)
+  {
+    var result = await _consultationServices.StartWalkInConsultationAsync(dto);
+    return result.IsSuccess ? Ok(result.Value) : HandleFailure(result);
+  }
+
   [HttpPost("finalize")]
+  [Authorize(Policy = "RequireConsultationsActiveView")]
   public async Task<IActionResult> FinalizeConsultation([FromBody] FinishConsultationDto dto)
   {
     var result = await _consultationServices.FinishConsultationAsync(dto);
@@ -35,6 +45,7 @@ public class ConsultationController : BaseController
   }
 
   [HttpPost("rollback/{id}")]
+  [Authorize(Policy = "RequireConsultationsActiveView")]
   public async Task<IActionResult> RollbackConsultation(int id)
   {
     var result = await _consultationServices.RollbackConsultationAsync(id);
@@ -43,6 +54,7 @@ public class ConsultationController : BaseController
   }
 
   [HttpGet("by-appointment/{appointmentId}")]
+  [Authorize(Policy = "RequireAppointmentReadView")]
   public async Task<IActionResult> GetByAppointmentId(int appointmentId)
   {
     var result = await _consultationServices.GetConsultationByAppointmentIdAsync(appointmentId);
@@ -50,6 +62,7 @@ public class ConsultationController : BaseController
   }
 
   [HttpGet("by-patient/{patientId}")]
+  [Authorize(Policy = "RequirePrescriptionReadView")]
   public async Task<IActionResult> GetByPatient(int patientId)
   {
     var result = await _consultationServices.GetConsultationsByPatientIdAsync(patientId);
@@ -57,6 +70,7 @@ public class ConsultationController : BaseController
   }
 
   [HttpGet("all")]
+  [Authorize(Policy = "RequireConsultationsHistoryView")]
   public async Task<IActionResult> GetAll()
   {
     var result = await _consultationServices.GetAllConsultationsAsync();
@@ -64,6 +78,7 @@ public class ConsultationController : BaseController
   }
 
   [HttpGet("{id}/pdf")]
+  [Authorize(Policy = "RequireConsultationsHistoryView")]
   public async Task<IActionResult> GetConsultationPdf(int id)
   {
     // Nota: El parámetro «id» se trata aquí como AppointmentId para que coincida con los datos disponibles en la interfaz de usuario (appt.id).

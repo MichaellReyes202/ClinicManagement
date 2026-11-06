@@ -83,6 +83,16 @@ namespace Application.Services
             }
             return await _userManager.FindByEmailAsync(email);
         }
+        public async Task<User?> GetCurrentUserWithEmployeeAsync()
+        {
+            var email = await GetEmailUserOnlyAsync();
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return null;
+            }
+
+            return await _userRepository.GetUserWithEmployeeByEmailAsync(email);
+        }
         public async Task<string?> GetEmailUserOnlyAsync()
         {
             var user = _httpContextAccessor.HttpContext?.User;

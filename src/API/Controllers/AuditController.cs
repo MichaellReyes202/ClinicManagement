@@ -10,7 +10,7 @@ namespace API.Controllers;
 
 [ApiController]
 [Route("api/audit")]
-[Authorize(Policy = "RequireAdministrationView")] // Solo administradores deben acceder a logs
+[Authorize(Policy = "RequireAdminAuditView")] // Solo usuarios con permiso de auditoría pueden acceder a logs
 public class AuditController : BaseController
 {
   private readonly IAuditlogServices _auditlogServices;

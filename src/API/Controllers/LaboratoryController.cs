@@ -19,6 +19,7 @@ public class LaboratoryController : BaseController
   }
 
   [HttpPost("order")]
+  [Authorize(Policy = "RequireConsultationsActiveView")]
   public async Task<IActionResult> CreateOrder([FromBody] ExamOrderDto dto)
   {
     var result = await _laboratoryServices.CreateExamOrderAsync(dto);
@@ -30,6 +31,7 @@ public class LaboratoryController : BaseController
   }
 
   [HttpPut("process")]
+  [Authorize(Policy = "RequireLabResultsView")]
   public async Task<IActionResult> ProcessExam([FromBody] ExamProcessDto dto)
   {
     var result = await _laboratoryServices.ProcessExamAsync(dto);
@@ -41,6 +43,7 @@ public class LaboratoryController : BaseController
   }
 
   [HttpGet("pending")]
+  [Authorize(Policy = "RequireLabResultsView")]
   public async Task<IActionResult> GetPendingExams()
   {
     var result = await _laboratoryServices.GetPendingExamsAsync();
@@ -52,6 +55,7 @@ public class LaboratoryController : BaseController
   }
 
   [HttpGet("by-appointment/{appointmentId}")]
+  [Authorize(Policy = "RequireLabReadView")]
   public async Task<IActionResult> GetByAppointmentId(int appointmentId)
   {
     var result = await _laboratoryServices.GetExamsByAppointmentIdAsync(appointmentId);
@@ -62,6 +66,7 @@ public class LaboratoryController : BaseController
     return BadRequest(result.Error);
   }
   [HttpGet("by-patient/{patientId}")]
+  [Authorize(Policy = "RequireLabReadView")]
   public async Task<IActionResult> GetByPatient(int patientId)
   {
     var result = await _laboratoryServices.GetExamsByPatientIdAsync(patientId);
@@ -73,6 +78,7 @@ public class LaboratoryController : BaseController
   }
 
   [HttpGet("all")]
+  [Authorize(Policy = "RequireLabHistoryView")]
   public async Task<IActionResult> GetAllExams()
   {
     var result = await _laboratoryServices.GetAllExamsAsync();

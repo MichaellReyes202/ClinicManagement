@@ -110,17 +110,33 @@ builder.Services.Configure<ApiBehaviorOptions>(options =>
 builder.Services.AddCors(options =>
 {
     var allowedOrigins = builder.Configuration.GetSection("CorsSettings:AllowedOrigins").Get<string[]>()
-        ?? new[] { "http://localhost:5174", "http://localhost:5173" };
+        ?.Where(origin => !string.IsNullOrWhiteSpace(origin))
+        .Select(origin => origin.Trim().TrimEnd('/'))
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .ToArray();
+
+    if (allowedOrigins is null || allowedOrigins.Length == 0)
+    {
+        if (builder.Environment.IsDevelopment())
+        {
+            allowedOrigins = ["http://localhost:5174", "http://localhost:5173"];
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "CorsSettings:AllowedOrigins must contain the deployed frontend origin(s)."
+            );
+        }
+    }
 
     options.AddPolicy(
         "AllowFrontend",
         policy =>
         {
             policy
-                .SetIsOriginAllowed(origin => true) // Permite cualquier localhost o túnel dev durante desarrollo
+                .WithOrigins(allowedOrigins)
                 .AllowAnyMethod()
-                .AllowAnyHeader()
-                .AllowCredentials(); // si usas cookies o tokens Bearer
+                .AllowAnyHeader(); // La autenticación usa Bearer, no cookies cross-site.
         }
     );
 });
@@ -241,6 +257,20 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             });
     });
+
+    options.AddPolicy("PasswordResetPolicy", httpContext =>
+    {
+        var remoteIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: $"password-reset:{remoteIp}",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0
+            }
+        );
+    });
 });
 
 // Supabase Configuration
@@ -298,7 +328,7 @@ builder
         options.Password.RequireLowercase = true;
         options.Password.RequireUppercase = true;
         options.Password.RequireNonAlphanumeric = false;
-        options.Password.RequiredLength = 6;
+        options.Password.RequiredLength = 8;
         options.User.RequireUniqueEmail = true;
         options.User.AllowedUserNameCharacters =
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
@@ -312,9 +342,11 @@ builder
 // Configuracion de la autenticacion con JWT
 var jwtSettings = builder.Configuration.GetSection("JwtSettings");
 var jwtKey = jwtSettings["Key"];
-if (string.IsNullOrEmpty(jwtKey))
+var jwtIssuer = jwtSettings["Issuer"];
+var jwtAudience = jwtSettings["Audience"];
+if (string.IsNullOrWhiteSpace(jwtKey) || string.IsNullOrWhiteSpace(jwtIssuer) || string.IsNullOrWhiteSpace(jwtAudience))
 {
-    throw new InvalidOperationException("JWT signing key is not configured in JwtSettings:Key.");
+    throw new InvalidOperationException("JwtSettings:Key, JwtSettings:Issuer, and JwtSettings:Audience must be configured.");
 }
 var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
@@ -329,8 +361,10 @@ builder
         opciones.MapInboundClaims = false;
         opciones.TokenValidationParameters = new TokenValidationParameters
         {
-            ValidateIssuer = false,
-            ValidateAudience = false,
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = key,
@@ -399,76 +433,61 @@ builder
 
 // Agregar servicio de autorización
 
-builder
-    .Services.AddAuthorizationBuilder()
-    .AddPolicy("RequireDashboardView", policy => policy.RequireClaim("view", "Dashboard"))
-    .AddPolicy(
-        "RequirePatientsView",
-        policy =>
-            policy.RequireClaim(
-                "view",
-                "Pacientes - Buscar",
-                "Pacientes - Registrar",
-                "Pacientes - Historial de Paciente"
-            )
-    )
-    .AddPolicy(
-        "RequireBillingView",
-        policy =>
-            policy.RequireClaim(
-                "view",
-                "Facturación - Factura",
-                "Facturación - Pagos",
-                "Facturación - Cierre de caja",
-                "Facturación - Promociones"
-            )
-    )
-    .AddPolicy(
-        "RequireConsultationsView",
-        policy =>
-            policy.RequireClaim(
-                "view",
-                "Citas - Hoy",
-                "Citas - Agendar",
-                "Citas - Disponibilidad",
-                "Consultas - Activa",
-                "Consultas - Crear",
-                "Consultas - Historial"
-            )
-    )
-    .AddPolicy(
-        "RequireLabView",
-        policy =>
-            policy.RequireClaim(
-                "view",
-                "Laboratorio - Registrar Resultados",
-                "Laboratorio - Historial",
-                "Laboratorio - Catálogo de Exámenes"
-            )
-    )
-    .AddPolicy(
-        "RequireHRView",
-        policy =>
-            policy.RequireClaim(
-                "view",
-                "Recursos Humanos - Empleados",
-                "Recursos Humanos - Asistencia",
-                "Recursos Humanos - Especialidades",
-                "Recursos Humanos - Cargos"
-            )
-    )
-    .AddPolicy("RequireReportsView", policy => policy.RequireClaim("view", "Reportes"))
-    .AddPolicy(
-        "RequireAdministrationView",
-        policy =>
-            policy.RequireClaim(
-                "view",
-                "Administración - Usuarios",
-                "Administración - Horarios",
-                "Administración - Auditoría",
-                "Administración - Archivos Digitales"
-            )
-    );
+var viewPolicies = new Dictionary<string, string[]>
+{
+    ["RequireDashboardView"] = ["Dashboard"],
+    ["RequirePatientsSearchView"] = ["Pacientes - Buscar"],
+    ["RequirePatientsRegisterView"] = ["Pacientes - Registrar"],
+    ["RequirePatientsHistoryView"] = ["Pacientes - Historial de Paciente"],
+    ["RequireAppointmentsTodayView"] = ["Citas - Hoy"],
+    ["RequireAppointmentsStatusView"] = ["Citas - Hoy", "Consultas - Crear"],
+    ["RequireAppointmentsScheduleView"] = ["Citas - Agendar", "Consultas - Crear"],
+    ["RequireAppointmentsAvailabilityView"] = ["Citas - Disponibilidad", "Citas - Agendar", "Consultas - Crear"],
+    ["RequireConsultationsActiveView"] = ["Consultas - Activa", "Consultas - Crear", "Citas - Hoy"],
+    ["RequireConsultationsStartView"] = ["Consultas - Activa", "Consultas - Crear", "Citas - Hoy"],
+    ["RequireConsultationsCreateView"] = ["Consultas - Crear"],
+    ["RequireConsultationsHistoryView"] = ["Consultas - Historial"],
+    ["RequireLabResultsView"] = ["Laboratorio - Registrar Resultados"],
+    ["RequireLabHistoryView"] = ["Laboratorio - Historial"],
+    ["RequireLabCatalogView"] = ["Laboratorio - Catálogo de Exámenes"],
+    ["RequireBillingInvoiceView"] = ["Facturación - Factura"],
+    ["RequireBillingPaymentsView"] = ["Facturación - Pagos"],
+    ["RequireBillingCashCloseView"] = ["Facturación - Cierre de caja"],
+    ["RequireBillingPromotionsView"] = ["Facturación - Promociones"],
+    ["RequireHREmployeesView"] = ["Recursos Humanos - Empleados"],
+    ["RequireHRAttendanceView"] = ["Recursos Humanos - Asistencia"],
+    ["RequireHRSpecialtiesView"] = ["Recursos Humanos - Especialidades"],
+    ["RequireHRPositionsView"] = ["Recursos Humanos - Cargos"],
+    ["RequireReportsView"] = ["Reportes"],
+    ["RequireAdminUsersView"] = ["Administración - Usuarios"],
+    ["RequireAdminSchedulesView"] = ["Administración - Horarios"],
+    ["RequireAdminAuditView"] = ["Administración - Auditoría"],
+    ["RequireAdminFilesView"] = ["Administración - Archivos Digitales"],
+    // Datos compartidos por varias vistas; el acceso sigue requiriendo una vista concreta.
+    ["RequirePatientReadView"] = ["Pacientes - Buscar", "Pacientes - Registrar", "Pacientes - Historial de Paciente", "Consultas - Activa", "Consultas - Crear", "Consultas - Historial", "Citas - Agendar"],
+    ["RequireAppointmentReadView"] = ["Citas - Hoy", "Citas - Agendar", "Consultas - Activa", "Consultas - Crear", "Consultas - Historial"],
+    ["RequireEmployeeReadView"] = ["Recursos Humanos - Empleados", "Citas - Agendar", "Citas - Disponibilidad", "Administración - Usuarios", "Administración - Horarios"],
+    ["RequireSpecialtyReadView"] = ["Recursos Humanos - Empleados", "Recursos Humanos - Especialidades", "Citas - Agendar", "Citas - Disponibilidad", "Laboratorio - Catálogo de Exámenes"],
+    ["RequirePositionReadView"] = ["Recursos Humanos - Empleados", "Recursos Humanos - Cargos"],
+    ["RequireMedicationReadView"] = ["Consultas - Activa", "Consultas - Crear", "Facturación - Factura"],
+    ["RequirePrescriptionReadView"] = ["Consultas - Activa", "Consultas - Crear", "Consultas - Historial", "Pacientes - Historial de Paciente"],
+    ["RequireLabReadView"] = ["Laboratorio - Registrar Resultados", "Laboratorio - Historial", "Consultas - Activa", "Consultas - Crear", "Consultas - Historial", "Pacientes - Historial de Paciente"],
+    ["RequireCatalogReadView"] = ["Pacientes - Registrar", "Recursos Humanos - Empleados", "Citas - Agendar", "Citas - Disponibilidad"],
+};
+
+var authorizationBuilder = builder.Services.AddAuthorizationBuilder();
+foreach (var (policyName, viewNames) in viewPolicies)
+{
+    authorizationBuilder.AddPolicy(policyName, policy => policy.RequireClaim("view", viewNames));
+}
+
+// Rechaza por defecto cualquier endpoint sin permiso explícito. Las rutas públicas
+// declaran [AllowAnonymous], y las rutas privadas deben además exigir su vista.
+authorizationBuilder.SetFallbackPolicy(
+    new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build()
+);
 builder.Services.AddOpenApi();
 
 var app = builder.Build();

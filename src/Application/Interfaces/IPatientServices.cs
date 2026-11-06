@@ -15,6 +15,7 @@ namespace Application.Interfaces
         Task<Result<PaginatedResponseDto<PatientResponseDto>>> GetAllPatients(PaginationDto pagination);
         Task<Result<PatientResponseDto>> GetPatientById(int Id);
         Task<Result<PaginatedResponseDto<PatientSearchDto>>> SearchPatient(PaginationDto pagination);
+        Task<Result<PaginatedResponseDto<PatientSearchDto>>> GetRecentPatients(PaginationDto pagination);
         Task<Result> UpdatePatientAsync(PatientUpdateDto dto, int patientId);
     }
 }

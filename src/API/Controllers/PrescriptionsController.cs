@@ -19,6 +19,7 @@ public class PrescriptionsController : BaseController
   }
 
   [HttpPost]
+  [Authorize(Policy = "RequireConsultationsActiveView")]
   public async Task<IActionResult> Create([FromBody] CreatePrescriptionDto dto)
   {
     var result = await _prescriptionServices.CreatePrescriptionAsync(dto);
@@ -26,6 +27,7 @@ public class PrescriptionsController : BaseController
   }
 
   [HttpGet("by-consultation/{consultationId}")]
+  [Authorize(Policy = "RequirePrescriptionReadView")]
   public async Task<IActionResult> GetByConsultationId(int consultationId)
   {
     var result = await _prescriptionServices.GetByConsultationIdAsync(consultationId);
@@ -33,6 +35,7 @@ public class PrescriptionsController : BaseController
   }
 
   [HttpGet("by-patient/{patientId}")]
+  [Authorize(Policy = "RequirePrescriptionReadView")]
   public async Task<IActionResult> GetByPatientId(int patientId)
   {
     var result = await _prescriptionServices.GetByPatientIdAsync(patientId);
