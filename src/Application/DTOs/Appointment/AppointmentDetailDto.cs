@@ -10,5 +10,6 @@ public class AppointmentDetailDto
     public required string Doctor { get; set; }
     public int DoctorId { get; set; }
     public DateTime StartTime { get; set; }
+    public int Duration { get; set; }
     public string? Reason { get; set; }
 }

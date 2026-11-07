@@ -93,6 +93,7 @@ public class AppointmentServices : IAppointmentServices
         DoctorId = appointment.EmployeeId ?? 0,
         Doctor = appointment.Employee != null ? $"{appointment.Employee.FirstName} {appointment.Employee.LastName}".Trim() : "No Assigned",
         StartTime = TimeZoneInfo.ConvertTimeFromUtc(appointment.StartTime, userTimeZone),
+        Duration = appointment.Duration,
         Reason = appointment.Reason,
 
         Patient = new PatientByAppointmentDto
@@ -144,6 +145,7 @@ public class AppointmentServices : IAppointmentServices
         )
           return Result.Failure(new Error(ErrorCodes.BadRequest, "The statusId exchange rate is not valid", "StatusId"));
 
+        var previousStatusId = appointment.StatusId;
         appointment.StatusId = dto.StatusId;
         await _appointmentRepository.UpdateAsync(appointment);
         await _appointmentRepository.SaveChangesAsync();
@@ -152,7 +154,7 @@ public class AppointmentServices : IAppointmentServices
         {
           var currentUser = await _userService.GetCurrentUserAsync();
           var statusNames = new Dictionary<int, string> { {1,"Programada"},{2,"Confirmada"},{3,"En curso"},{4,"Completada"},{5,"Cancelada"},{6,"Vencida"} };
-          var changeDetail = $"Estado cambiado de {statusNames.GetValueOrDefault(appointment.StatusId, "Desconocido")} a {statusNames.GetValueOrDefault(dto.StatusId, "Desconocido")}";
+          var changeDetail = $"Estado cambiado de {statusNames.GetValueOrDefault(previousStatusId, "Desconocido")} a {statusNames.GetValueOrDefault(dto.StatusId, "Desconocido")}";
           await _auditlogServices.RegisterActionAsync(userId: currentUser?.Id, module: Domain.Enums.AuditModuletype.Appointments, actionType: Domain.Enums.ActionType.STATUS_CHANGE, recordDisplay: $"Cita #{appointment.Id}", recordId: appointment.Id, status: Domain.Enums.AuditStatus.SUCCESS, changeDetail: changeDetail);
         }
         catch (Exception auditEx) { Console.WriteLine($"Error registrando auditoría: {auditEx.Message}"); }
@@ -475,7 +477,7 @@ public class AppointmentServices : IAppointmentServices
         if (!patientExists)
           return Result<int>.Failure(new Error(ErrorCodes.NotFound, "The patient does not exist or is inactive", "PatientId"));
 
-        var doctorExists = await _employesRepository.ExistAsync(e => e.Id == dto.EmployeeId && e.IsActive.HasValue && e.PositionId == 1);
+        var doctorExists = await _employesRepository.ExistAsync(e => e.Id == dto.EmployeeId && e.IsActive == true && e.PositionId == 1);
         if (!doctorExists)
           return Result<int>.Failure(new Error(ErrorCodes.NotFound, "The doctor does not exist or is inactive.", "EmployeeId"));
 
@@ -489,6 +491,12 @@ public class AppointmentServices : IAppointmentServices
             a.StartTime.AddMinutes(a.Duration) > startTimeUtc && a.StatusId != 5 && a.StatusId != 6);
         if (patientHasOverlap)
           return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "The patient already has an appointment at that time.", "StartTime"));
+
+        var doctorHasOverlap = await _appointmentRepository.ExistAsync(a =>
+            a.EmployeeId == dto.EmployeeId && a.StartTime < endTimeUtc &&
+            a.StartTime.AddMinutes(a.Duration) > startTimeUtc && a.StatusId != 5 && a.StatusId != 6);
+        if (doctorHasOverlap)
+          return Result<int>.Failure(new Error(ErrorCodes.BadRequest, "The doctor already has an appointment at that time.", "StartTime"));
 
         var appointment = _mapper.Map<Appointment>(dto);
         appointment.StartTime = startTimeUtc;

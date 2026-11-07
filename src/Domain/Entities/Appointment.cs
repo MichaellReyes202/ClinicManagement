@@ -37,6 +37,8 @@ public partial class Appointment
 
     public virtual ICollection<Exam> Exams { get; set; } = new List<Exam>();
 
+    public virtual AppointmentReminder? Reminder { get; set; }
+
     public virtual Patient? Patient { get; set; }
 
     public virtual CatAppointmentStatus Status { get; set; } = null!;

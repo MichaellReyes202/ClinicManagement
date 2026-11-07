@@ -115,6 +115,12 @@ public class ChatService : IChatService
             await _dbContext.SaveChangesAsync(ct);
         }
 
+        if (_httpContextAccessor.HttpContext != null)
+        {
+            _httpContextAccessor.HttpContext.Items["chat_user_id"] = userId;
+            _httpContextAccessor.HttpContext.Items["chat_conversation_id"] = conversation.Id;
+        }
+
         // 4. Guardar mensaje del usuario
         var userMsg = new ChatMessage
         {
@@ -171,6 +177,14 @@ public class ChatService : IChatService
             FORMATO DE TABLAS: Cuando el usuario solicite una lista, tabla o resumen, consulta la información con tus herramientas y preséntala en una tabla Markdown (ejemplo: | Nombre | DNI | Teléfono |). Nunca digas que no puedes generar tablas.
 
             HERRAMIENTAS: Utiliza las herramientas disponibles para consultar la base de datos antes de responder. Para solicitudes de pacientes recientes o últimos agregados, usa BuscarPacientes con el término 'recientes' y presenta los resultados en el orden recibido, indicando la fecha de registro. Nunca afirmes que no puedes consultar esos datos sin haber intentado la herramienta. Nunca sustituyas una consulta reciente por una lista general. Nunca imprimas fragmentos JSON ni etiquetas internas como <tool_call> en tu respuesta final.
+
+            HORARIOS Y CITAS: Para consultar horarios usa ObtenerHorariosClinica y comunica los días abiertos y sus horas exactas. La sede configurada en este sistema es Oficentro Masaya; no inventes otras sedes. Para solicitudes de cita, recopila motivo, sede (si solo existe la configurada, confírmala), preferencia de día/hora, paciente y médico. Usa BuscarPacientes y BuscarMedicosParaCita para resolver registros e IDs. Si falta información, pregunta únicamente por ella. Usa 30 minutos si no indican duración y envía hora local YYYY-MM-DDTHH:mm a AgendarCita. Confirma que quedó guardada solo si la herramienta devuelve exito=true y citaId. Informa por separado si no se pudo enviar el correo de confirmación; nunca digas que fue enviado si el resultado no lo indica.
+
+            CONFIRMACIONES Y RECORDATORIOS: Al crear una cita, la herramienta intenta enviar confirmación al correo de contacto registrado. El sistema programa además un recordatorio por correo 24 horas antes, cuando existe correo válido. No prometas envío por SMS ni WhatsApp.
+
+            CAMBIO O CANCELACIÓN: Antes de modificar una cita usa BuscarCitas con nombre y, si hace falta, fecha. Si hay varias coincidencias pregunta cuál es; nunca elijas una cita por suposición. Usa CambiarOCancelarCita con el ID exacto. Para reprogramar pide y confirma nueva fecha y hora. Solo confirma el cambio si devuelve exito=true. Si devuelve escalado=true, informa que la excepción quedó registrada para el personal; no digas que la cita se canceló o cambió.
+
+            DUDAS CLÍNICAS Y ESCALAMIENTO: No diagnostiques, no prescribas ni reemplaces al personal sanitario. Puedes hacer preguntas breves para entender y clasificar la urgencia. Ante dolor opresivo en el pecho, dificultad respiratoria, desmayo, signos de derrame cerebral, hemorragia grave, reacción alérgica intensa o riesgo inmediato de autolesión, indica que busque atención de urgencia ahora o contacte los servicios de emergencia locales; no espere una respuesta del chat. En casos no urgentes, ofrece registrar la solicitud con SolicitarApoyoClinico y afirma que fue escalada solo tras éxito=true. El personal puede revisar pendientes con ObtenerApoyosClinicosPendientes y marcar como atendida solo después de dar seguimiento con ResolverApoyoClinico.
 
             == CONTEXTO ACTUAL ==
             - Usuario: {userName}
@@ -233,6 +247,8 @@ public class ChatService : IChatService
         var assistantContentBuilder = new StringBuilder();
         int? tokensUsed = null;
         bool generationCompleted = false;
+        bool appointmentsChanged = false;
+        bool clinicalEscalationsChanged = false;
 
         var streamingResponse = chatCompletion.GetStreamingChatMessageContentsAsync(
             chatHistory: chatHistory,
@@ -296,6 +312,13 @@ public class ChatService : IChatService
             sw.Stop();
 
             string cleanedContent = CleanAssistantContent(assistantContentBuilder.ToString());
+            var toolExecutions = _executionTracker.GetExecutions();
+            appointmentsChanged = generationCompleted && toolExecutions.Any(execution =>
+                string.Equals(execution.ToolName, "ClinicPlugin.AgendarCita", StringComparison.Ordinal) ||
+                string.Equals(execution.ToolName, "ClinicPlugin.CambiarOCancelarCita", StringComparison.Ordinal));
+            clinicalEscalationsChanged = generationCompleted && toolExecutions.Any(execution =>
+                string.Equals(execution.ToolName, "ClinicPlugin.SolicitarApoyoClinico", StringComparison.Ordinal) ||
+                string.Equals(execution.ToolName, "ClinicPlugin.CambiarOCancelarCita", StringComparison.Ordinal));
 
             // No guardar respuestas truncadas como completas cuando se cancela o falla el proveedor.
             if (generationCompleted && cleanedContent.Length > 0)
@@ -315,7 +338,6 @@ public class ChatService : IChatService
 
                 // Las salidas de herramientas pueden contener datos clínicos; el filtro
                 // persiste una auditoría redactada, nunca el contenido clínico crudo.
-                var toolExecutions = _executionTracker.GetExecutions();
                 if (toolExecutions.Count > 0)
                 {
                     foreach (var exec in toolExecutions)
@@ -336,6 +358,24 @@ public class ChatService : IChatService
             }
 
             _executionTracker.Clear();
+        }
+
+        if (appointmentsChanged)
+        {
+            yield return new ChatStreamEventDto
+            {
+                Type = "data_changed",
+                Message = "appointments"
+            };
+        }
+
+        if (clinicalEscalationsChanged)
+        {
+            yield return new ChatStreamEventDto
+            {
+                Type = "data_changed",
+                Message = "clinical_escalations"
+            };
         }
     }
 

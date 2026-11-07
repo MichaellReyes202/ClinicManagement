@@ -194,6 +194,7 @@ builder.Services.Configure<Application.Models.MailSettings>(
     builder.Configuration.GetSection("EMAIL_SETTINGS")
 );
 builder.Services.AddTransient<IEmailService, EmailService>();
+builder.Services.AddHostedService<Infrastructure.Services.AppointmentReminderWorker>();
 
 // Configuración y registro de AI / Semantic Kernel (Singleton)
 builder.Services.Configure<Application.Models.AiSettings>(

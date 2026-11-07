@@ -25,6 +25,10 @@ public partial class ChatConversation
 
     public virtual ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
 
+    public virtual ICollection<ChatClinicalEscalation> ClinicalEscalations { get; set; } = new List<ChatClinicalEscalation>();
+
+    public virtual ICollection<ChatAppointmentEscalation> AppointmentEscalations { get; set; } = new List<ChatAppointmentEscalation>();
+
     public virtual CatAiModel? Model { get; set; }
 
     public virtual Role? Role { get; set; }
