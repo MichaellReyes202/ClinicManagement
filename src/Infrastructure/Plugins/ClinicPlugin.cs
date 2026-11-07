@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Application.DTOs;
@@ -89,9 +90,9 @@ public class ClinicPlugin
         return JsonSerializer.Serialize(list);
     }
 
-    [KernelFunction, Description("Busca médicos activos para ayudar a agendar una cita. Devuelve sus identificadores, nombres, especialidades y disponibilidad; usa los IDs exactos al llamar AgendarCita.")]
+    [KernelFunction, Description("Busca médicos activos por nombre, especialidad o DNI. Si recibe la solicitud completa, extrae el DNI asociado al doctor/médico, no el DNI del paciente. Devuelve la próxima fecha y hora futura disponible; no confundas una disponibilidad futura con si el médico está atendiendo en este instante. Devuelve la duración configurada.")]
     public async Task<string> BuscarMedicosParaCita(
-        [Description("Nombre o especialidad para filtrar los médicos. Opcional.")] string? terminoBusqueda = null)
+        [Description("Nombre, especialidad o DNI completo del médico. Si se proporciona un DNI, envíalo aquí sin modificarlo.")] string? terminoBusqueda = null)
     {
         if (!HasAnyView("Citas - Agendar", "Consultas - Crear"))
         {
@@ -100,16 +101,18 @@ public class ClinicPlugin
 
         using var scope = _scopeFactory.CreateScope();
         var appointmentServices = scope.ServiceProvider.GetRequiredService<IAppointmentServices>();
-        var result = await appointmentServices.GetDoctorAvailabilityAsync();
+        var term = terminoBusqueda?.Trim();
+        var dni = ExtractDniForRole(term, @"\b(?:doctor|m[eé]dico)\b") ?? ExtractDni(term);
+        var isDniSearch = dni != null;
+        var result = await appointmentServices.GetDoctorAvailabilityAsync(dni: dni);
         if (result.IsFailure || result.Value == null)
         {
             return $"Error al consultar médicos: {result.Error?.Description ?? "No se pudo obtener la lista de médicos."}";
         }
 
         var doctors = result.Value.AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(terminoBusqueda))
+        if (!string.IsNullOrWhiteSpace(term) && !isDniSearch)
         {
-            var term = terminoBusqueda.Trim();
             doctors = doctors.Where(doctor =>
                 doctor.FullName.Contains(term, StringComparison.OrdinalIgnoreCase) ||
                 doctor.SpecialtyName.Contains(term, StringComparison.OrdinalIgnoreCase));
@@ -120,16 +123,70 @@ public class ClinicPlugin
             doctor.DoctorId,
             doctor.FullName,
             doctor.SpecialtyName,
-            doctor.IsAvailable,
-            doctor.NextAppointmentDisplay
+            doctor.NextAppointmentDisplay,
+            doctor.AppointmentDurationMinutes
         }).ToList();
 
         return list.Count == 0
-            ? $"No se encontraron médicos que coincidan con '{terminoBusqueda}'."
+            ? isDniSearch
+                ? "No se encontró un médico activo con el DNI proporcionado."
+                : $"No se encontraron médicos que coincidan con '{terminoBusqueda}'."
             : JsonSerializer.Serialize(list);
     }
 
-    [KernelFunction, Description("Crea y guarda una cita médica real en el sistema. Llama esta herramienta únicamente cuando el usuario haya solicitado agendar y estén confirmados pacienteId, medicoId, fechaHora, duración y motivo. fechaHora debe ser la hora local del usuario en formato YYYY-MM-DDTHH:mm, sin zona horaria. No afirmes que la cita fue agregada a menos que esta herramienta devuelva éxito con un número de cita.")]
+    private static string? ExtractDni(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var match = Regex.Match(
+            value,
+            @"(?<![A-Z0-9])\d{3}[\s-]?\d{6}[\s-]?\d{4}[\s-]?[A-Z](?![A-Z0-9])",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        return new string(match.Value
+            .Where(char.IsAsciiLetterOrDigit)
+            .Select(char.ToUpperInvariant)
+            .ToArray());
+    }
+
+    private static string? ExtractDniForRole(string? value, string rolePattern)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var roleMatch = Regex.Match(
+            value,
+            rolePattern,
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (!roleMatch.Success)
+        {
+            return null;
+        }
+
+        var roleContext = value[(roleMatch.Index + roleMatch.Length)..];
+        var nextRole = Regex.Match(
+            roleContext,
+            @"\b(?:paciente|patient|doctor|m[eé]dico|medico)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (nextRole.Success)
+        {
+            roleContext = roleContext[..nextRole.Index];
+        }
+
+        return ExtractDni(roleContext);
+    }
+
+    [KernelFunction, Description("Crea y guarda una cita médica real en el sistema. Llama esta herramienta únicamente después de que el usuario haya confirmado explícitamente el resumen final y estén confirmados pacienteId, medicoId, fechaHora, duración y motivo. fechaHora debe ser la hora local del usuario en formato YYYY-MM-DDTHH:mm, sin zona horaria. No afirmes que la cita fue agregada a menos que esta herramienta devuelva éxito con un número de cita.")]
     public async Task<string> AgendarCita(
         [Description("ID exacto del paciente obtenido de BuscarPacientes.")] int pacienteId,
         [Description("ID exacto del médico obtenido de BuscarMedicosParaCita.")] int medicoId,
@@ -148,6 +205,24 @@ public class ClinicPlugin
         }
 
         using var scope = _scopeFactory.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<ClinicDbContext>();
+        if (!await HasExplicitAppointmentConfirmationAsync(dbContext))
+        {
+            return "No se creó la cita. Primero debo presentar el resumen y recibir tu confirmación explícita.";
+        }
+
+        var executionTracker = _httpContextAccessor.HttpContext?.RequestServices
+            .GetService<IChatToolExecutionTracker>();
+        var successfulSearches = executionTracker?.GetExecutions()
+            .Where(execution => execution.IsSuccess)
+            .Select(execution => execution.ToolName)
+            .ToHashSet(StringComparer.Ordinal) ?? new HashSet<string>(StringComparer.Ordinal);
+        if (!successfulSearches.Contains("ClinicPlugin.BuscarPacientes") ||
+            !successfulSearches.Contains("ClinicPlugin.BuscarMedicosParaCita"))
+        {
+            return "No se creó la cita porque aún no se validaron los registros del paciente y del médico en esta confirmación.";
+        }
+
         var appointmentServices = scope.ServiceProvider.GetRequiredService<IAppointmentServices>();
         var result = await appointmentServices.Add(new AppointmentCreateDto
         {
@@ -212,6 +287,75 @@ public class ClinicPlugin
         });
     }
 
+    private async Task<bool> HasExplicitAppointmentConfirmationAsync(ClinicDbContext dbContext)
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext == null ||
+            !int.TryParse(httpContext.Items["chat_conversation_id"]?.ToString(), out var conversationId) ||
+            !int.TryParse(httpContext.Items["chat_user_message_id"]?.ToString(), out var userMessageId) ||
+            !int.TryParse(httpContext.Items["chat_assistant_sender_type_id"]?.ToString(), out var assistantSenderTypeId))
+        {
+            return false;
+        }
+
+        var latestUserMessage = await dbContext.ChatMessages
+            .AsNoTracking()
+            .Where(message => message.Id == userMessageId && message.ConversationId == conversationId)
+            .Select(message => message.Content)
+            .FirstOrDefaultAsync();
+        var previousAssistantMessage = await dbContext.ChatMessages
+            .AsNoTracking()
+            .Where(message => message.ConversationId == conversationId &&
+                              message.Id < userMessageId &&
+                              message.SenderTypeId == assistantSenderTypeId)
+            .OrderByDescending(message => message.Id)
+            .Select(message => message.Content)
+            .FirstOrDefaultAsync();
+
+        if (string.IsNullOrWhiteSpace(latestUserMessage) || string.IsNullOrWhiteSpace(previousAssistantMessage))
+        {
+            return false;
+        }
+
+        bool assistantAskedToConfirm = Regex.IsMatch(
+            previousAssistantMessage,
+            @"\b(confirmas|confirma|confirmar|confirmación|confirmacion)\b[\s\S]{0,120}\b(cita|agendar|programar|reservar)\b|\b(cita|agendar|programar|reservar)\b[\s\S]{0,120}\b(confirmas|confirma|confirmar|confirmación|confirmacion)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        bool userDeclined = Regex.IsMatch(
+            latestUserMessage,
+            @"^\s*(no|mejor no|cancela|cancelar)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        bool userConfirmed = Regex.IsMatch(
+            latestUserMessage,
+            @"^\s*(sí|si|está bien|esta bien|de acuerdo|confirmo|confirmar|acepto|procede|adelante|crear|crea|genere|genera|haz|hazla|registra|registrar|agéndala|agendala)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        return assistantAskedToConfirm &&
+               HasCompleteAppointmentSummary(previousAssistantMessage) &&
+               userConfirmed &&
+               !userDeclined;
+    }
+
+    private static bool HasCompleteAppointmentSummary(string message)
+    {
+        var options = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
+        bool hasPatient = Regex.IsMatch(message, @"\bpaciente\b", options);
+        bool hasSite = Regex.IsMatch(message, @"\b(sede|ubicación|ubicacion)\b", options) &&
+                       message.Contains("Oficentro Masaya", StringComparison.OrdinalIgnoreCase);
+        bool hasDoctor = Regex.IsMatch(message, @"\b(doctor|m[eé]dico|medico)\b", options);
+        bool hasReason = Regex.IsMatch(message, @"\bmotivo\b", options);
+        bool hasDate = Regex.IsMatch(
+            message,
+            @"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\s+de\s+[a-záéíóúñ]+(?:\s+de\s+\d{4})?\b",
+            options);
+        bool hasTime = Regex.IsMatch(
+            message,
+            @"\b\d{1,2}:\d{2}\b|\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|horas?|de la mañana|de la tarde|de la noche)\b",
+            options);
+
+        return hasPatient && hasSite && hasDoctor && hasReason && hasDate && hasTime;
+    }
+
     [KernelFunction, Description("Busca citas futuras o de una fecha concreta por nombre del paciente o médico. Úsala antes de cancelar o reprogramar y solicita el ID exacto de la cita si hay más de una coincidencia.")]
     public async Task<string> BuscarCitas(string nombrePacienteOMedico, string? fecha = null)
     {
@@ -243,14 +387,15 @@ public class ClinicPlugin
         if (result.IsFailure || result.Value == null)
             return $"Error al consultar las citas: {result.Error?.Description ?? "Error de consulta."}";
 
-        var items = result.Value.Where(a => a.StatusId is 1 or 2)
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, GetTimeZone.GetRequestTimeZone(_httpContextAccessor));
+        var items = result.Value.Where(a => (a.StatusId is 1 or 2) && a.StartTime > localNow)
             .OrderBy(a => a.StartTime).Take(20)
             .Select(a => new { a.Id, a.PatientFullName, a.DoctorFullName, Fecha = a.StartTime.ToString("yyyy-MM-dd HH:mm"), a.Status, a.Reason })
             .ToList();
         return items.Count == 0 ? "No se encontraron citas futuras activas con esos datos." : JsonSerializer.Serialize(items);
     }
 
-    [KernelFunction, Description("Cancela o reprograma una cita existente. Primero llama BuscarCitas y usa el ID exacto. Al reprogramar, usa fecha y hora local YYYY-MM-DDTHH:mm. Nunca afirmes éxito si la operación falla.")]
+    [KernelFunction, Description("Cancela o reprograma una cita existente después de confirmación explícita del usuario. Primero llama BuscarCitas y usa el ID exacto. Al reprogramar, usa fecha y hora local YYYY-MM-DDTHH:mm. Nunca afirmes éxito si la operación falla.")]
     public async Task<string> CambiarOCancelarCita(
         int citaId,
         [Description("Escribe cancelar o reprogramar.")] string accion,
@@ -463,6 +608,7 @@ public class ClinicPlugin
             "the duration should be between 5 and 150 minutes." => "La duración debe estar entre 5 y 150 minutos.",
             "the patient already has an appointment at that time." => "El paciente ya tiene una cita en ese horario.",
             "the doctor already has an appointment at that time." => "El médico ya tiene una cita en ese horario.",
+            "the appointment must fit within the doctor's availability." => "El horario seleccionado no coincide con la disponibilidad del médico.",
             "the patient does not exist or is inactive" => "El paciente no existe o está inactivo.",
             "the doctor does not exist or is inactive." => "El médico no existe o está inactivo.",
             "unexpected error creating appointment." => "Ocurrió un error interno al guardar la cita.",
@@ -470,7 +616,7 @@ public class ClinicPlugin
         };
     }
 
-    [KernelFunction, Description("Busca pacientes por nombre o DNI, lista pacientes o consulta los más recientemente agregados. Cuando soliciten los últimos pacientes registrados, indica 'recientes' en terminoBusqueda; los resultados se ordenan por fecha de registro descendente.")]
+    [KernelFunction, Description("Busca pacientes por nombre o DNI, lista pacientes o consulta los más recientemente agregados. Para una solicitud completa de cita, extrae y busca el DNI asociado al paciente; no uses el DNI del médico. Cuando soliciten los últimos pacientes registrados, indica 'recientes' en terminoBusqueda.")]
     public async Task<string> BuscarPacientes(
         [Description("Nombre, apellido o DNI para buscar. Usa 'todos' para listar, o 'recientes'/'últimos agregados' para obtener los registros más nuevos primero.")] string? terminoBusqueda = null)
     {
@@ -485,15 +631,24 @@ public class ClinicPlugin
         bool recentSearch = false;
         if (!string.IsNullOrWhiteSpace(terminoBusqueda))
         {
-            string term = terminoBusqueda.Trim().ToLowerInvariant();
-            recentSearch = term.Contains("reciente") || term.Contains("último") ||
-                           term.Contains("ultimo") || term.Contains("nuevo") ||
-                           term.Contains("agregado") || term.Contains("agregados");
-
-            bool allPatients = term.Equals("todos") || term.Equals("registrados");
-            if (!recentSearch && !allPatients)
+            string term = terminoBusqueda.Trim();
+            var patientDni = ExtractDniForRole(term, @"\b(?:paciente|patient)\b") ?? ExtractDni(term);
+            if (patientDni != null)
             {
-                queryParam = terminoBusqueda.Trim();
+                queryParam = patientDni;
+            }
+            else
+            {
+                string normalizedTerm = term.ToLowerInvariant();
+                recentSearch = normalizedTerm.Contains("reciente") || normalizedTerm.Contains("último") ||
+                               normalizedTerm.Contains("ultimo") || normalizedTerm.Contains("nuevo") ||
+                               normalizedTerm.Contains("agregado") || normalizedTerm.Contains("agregados");
+
+                bool allPatients = normalizedTerm.Equals("todos") || normalizedTerm.Equals("registrados");
+                if (!recentSearch && !allPatients)
+                {
+                    queryParam = term;
+                }
             }
         }
 

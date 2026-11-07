@@ -7,6 +7,7 @@ using Application.DTOs.Chat;
 using Application.Interfaces;
 using Domain.Errors;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -21,11 +22,16 @@ public class ChatController : BaseController
 {
     private readonly IChatService _chatService;
     private readonly ILogger<ChatController> _logger;
+    private readonly IWebHostEnvironment _environment;
 
-    public ChatController(IChatService chatService, ILogger<ChatController> logger)
+    public ChatController(
+        IChatService chatService,
+        ILogger<ChatController> logger,
+        IWebHostEnvironment environment)
     {
         _chatService = chatService;
         _logger = logger;
+        _environment = environment;
     }
 
     private int GetCurrentUserId()
@@ -104,10 +110,13 @@ public class ChatController : BaseController
             _logger.LogError(ex, "Error procesando streaming de chat para el usuario {UserId}", userId);
             if (!ct.IsCancellationRequested)
             {
+                var rootException = ex.GetBaseException();
                 await WriteStreamEventAsync(new ChatStreamEventDto
                 {
                     Type = "error",
-                    Message = "No se pudo completar la respuesta. Intenta nuevamente."
+                    Message = _environment.IsDevelopment()
+                        ? $"Error interno ({rootException.GetType().Name}): {rootException.Message}"
+                        : "No se pudo completar la respuesta. Intenta nuevamente."
                 }, CancellationToken.None);
                 await Response.Body.FlushAsync(CancellationToken.None);
             }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.ExceptionServices;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Application.Interfaces;
 using Microsoft.AspNetCore.Http;
@@ -35,10 +36,37 @@ public class ChatToolInvocationFilter : IFunctionInvocationFilter
             var resultValue = context.Result.GetValue<object>();
             if (resultValue is string rawOutput &&
                 (rawOutput.StartsWith("Acceso denegado", StringComparison.OrdinalIgnoreCase) ||
-                 rawOutput.StartsWith("Error", StringComparison.OrdinalIgnoreCase)))
+                 rawOutput.StartsWith("Error", StringComparison.OrdinalIgnoreCase) ||
+                 rawOutput.StartsWith("No se encontraron pacientes", StringComparison.OrdinalIgnoreCase) ||
+                 rawOutput.StartsWith("No se encontró un médico activo", StringComparison.OrdinalIgnoreCase) ||
+                 rawOutput.StartsWith("No se creó la cita", StringComparison.OrdinalIgnoreCase)))
             {
                 isSuccess = false;
-                errorMessage = "La herramienta devolvió un error.";
+                errorMessage = "La herramienta no pudo completar la operación o no encontró coincidencias.";
+            }
+            else if (resultValue is string jsonOutput)
+            {
+                try
+                {
+                    using var document = JsonDocument.Parse(jsonOutput);
+                    if (document.RootElement.ValueKind == JsonValueKind.Array &&
+                        document.RootElement.GetArrayLength() == 0)
+                    {
+                        isSuccess = false;
+                        errorMessage = "La búsqueda no encontró coincidencias.";
+                    }
+                    else if (document.RootElement.ValueKind == JsonValueKind.Object &&
+                             document.RootElement.TryGetProperty("exito", out var successProperty) &&
+                             successProperty.ValueKind == JsonValueKind.False)
+                    {
+                        isSuccess = false;
+                        errorMessage = "La herramienta informó que la operación no se completó.";
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Las salidas que no son JSON se auditan sin conservar su contenido.
+                }
             }
         }
         catch (Exception ex)

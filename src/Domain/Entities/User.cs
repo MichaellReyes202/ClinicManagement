@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace Domain.Entities;
@@ -38,6 +38,10 @@ public partial class User
     public virtual ICollection<Appointment> AppointmentUpdatedByUsers { get; set; } = new List<Appointment>();
 
     public virtual ICollection<Auditlog> Auditlogs { get; set; } = new List<Auditlog>();
+
+    public virtual ICollection<ChatAppointmentEscalation> ChatAppointmentEscalations { get; set; } = new List<ChatAppointmentEscalation>();
+
+    public virtual ICollection<ChatClinicalEscalation> ChatClinicalEscalations { get; set; } = new List<ChatClinicalEscalation>();
 
     public virtual ICollection<ChatConversation> ChatConversations { get; set; } = new List<ChatConversation>();
 

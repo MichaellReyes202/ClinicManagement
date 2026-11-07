@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace Domain.Entities;
@@ -23,11 +23,11 @@ public partial class ChatConversation
 
     public DateTime UpdatedAt { get; set; }
 
+    public virtual ICollection<ChatAppointmentEscalation> ChatAppointmentEscalations { get; set; } = new List<ChatAppointmentEscalation>();
+
+    public virtual ICollection<ChatClinicalEscalation> ChatClinicalEscalations { get; set; } = new List<ChatClinicalEscalation>();
+
     public virtual ICollection<ChatMessage> ChatMessages { get; set; } = new List<ChatMessage>();
-
-    public virtual ICollection<ChatClinicalEscalation> ClinicalEscalations { get; set; } = new List<ChatClinicalEscalation>();
-
-    public virtual ICollection<ChatAppointmentEscalation> AppointmentEscalations { get; set; } = new List<ChatAppointmentEscalation>();
 
     public virtual CatAiModel? Model { get; set; }
 

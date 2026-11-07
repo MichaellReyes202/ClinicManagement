@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace Domain.Entities;
@@ -29,6 +29,10 @@ public partial class Appointment
 
     public int? UpdatedByUserId { get; set; }
 
+    public virtual AppointmentReminder? AppointmentReminder { get; set; }
+
+    public virtual ICollection<ChatAppointmentEscalation> ChatAppointmentEscalations { get; set; } = new List<ChatAppointmentEscalation>();
+
     public virtual Consultation? Consultation { get; set; }
 
     public virtual User? CreatedByUser { get; set; }
@@ -36,8 +40,6 @@ public partial class Appointment
     public virtual Employee? Employee { get; set; }
 
     public virtual ICollection<Exam> Exams { get; set; } = new List<Exam>();
-
-    public virtual AppointmentReminder? Reminder { get; set; }
 
     public virtual Patient? Patient { get; set; }
 

@@ -20,6 +20,7 @@ namespace Application.Services;
 public class AppointmentServices : IAppointmentServices
 {
   private readonly IAppointmentRepository _appointmentRepository;
+  private readonly IGenericRepository<ClinicSchedule> _clinicScheduleRepository;
   private readonly AppointmentCreateDtoValidator _createValidator;
   private readonly AppointmentUpdateDtoValidator _updateValidator;
   private readonly IValidator<UpdateStatusAppointmenDto> _updateStatusValidator;
@@ -32,6 +33,7 @@ public class AppointmentServices : IAppointmentServices
   private readonly IAuditlogServices _auditlogServices;
 
   public AppointmentServices(IAppointmentRepository appointmentRepository,
+      IGenericRepository<ClinicSchedule> clinicScheduleRepository,
       AppointmentCreateDtoValidator createValidator,
       AppointmentUpdateDtoValidator updateValidator,
       IValidator<UpdateStatusAppointmenDto> updateStatusValidator,
@@ -45,6 +47,7 @@ public class AppointmentServices : IAppointmentServices
   )
   {
     _appointmentRepository = appointmentRepository;
+    _clinicScheduleRepository = clinicScheduleRepository;
     _createValidator = createValidator;
     _updateValidator = updateValidator;
     _updateStatusValidator = updateStatusValidator;
@@ -233,21 +236,18 @@ public class AppointmentServices : IAppointmentServices
     }).ToList();
     return Result<List<TodayAppointmentDto>>.Success(result);
   }
-  public async Task<Result<List<DoctorAvailabilityDto>>> GetDoctorAvailabilityAsync(int? specialtyId = null)
+  public async Task<Result<List<DoctorAvailabilityDto>>> GetDoctorAvailabilityAsync(int? specialtyId = null, string? dni = null)
   {
     var userTimeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
     var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, userTimeZone);
     var localToday = localNow.Date;
     var localTomorrow = localToday.AddDays(1);
-    var utcStartOfDay = TimeZoneInfo.ConvertTimeToUtc(localToday, userTimeZone);
-    (TimeSpan start, TimeSpan end, int totalSlots) GetSchedule(DateTime date) => date.DayOfWeek switch
-    {
-      DayOfWeek.Sunday => (TimeSpan.Zero, TimeSpan.Zero, 0),
-      DayOfWeek.Saturday => (new TimeSpan(8, 0, 0), new TimeSpan(17, 0, 0), 18),
-      _ => (new TimeSpan(8, 0, 0), new TimeSpan(17, 0, 0), 18) // Lunes a Viernes 8-5
-    };
-    var (startToday, endToday, totalSlotsToday) = GetSchedule(localToday);
-    var baseQuery = await _employesRepository.GetQuery(e => e.IsActive == true && e.PositionId == 1 && (specialtyId == null || e.SpecialtyId == specialtyId));
+    var utcStartOfDay = TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localToday, DateTimeKind.Unspecified), userTimeZone);
+    var clinicScheduleQuery = await _clinicScheduleRepository.GetQuery();
+    var clinicSchedules = await clinicScheduleQuery.AsNoTracking().ToDictionaryAsync(s => s.DayOfWeek);
+    var baseQuery = await _employesRepository.GetQuery(
+        e => e.IsActive == true && e.PositionId == 1 && (specialtyId == null || e.SpecialtyId == specialtyId),
+        include: q => q.Include(e => e.EmployeeSchedules));
     var doctorsData = await baseQuery
         .AsNoTracking()
         .Select(d => new
@@ -257,6 +257,13 @@ public class AppointmentServices : IAppointmentServices
           FutureAppointments = d.Appointments.Where(a => (a.StatusId == 1 || a.StatusId == 2 || a.StatusId == 3) && a.StartTime >= utcStartOfDay).ToList()
         })
         .ToListAsync();
+    if (!string.IsNullOrWhiteSpace(dni))
+    {
+      var normalizedDni = NormalizeDni(dni);
+      doctorsData = doctorsData
+          .Where(item => NormalizeDni(item.Doctor.Dni) == normalizedDni)
+          .ToList();
+    }
     if (!doctorsData.Any())
     {
       return Result<List<DoctorAvailabilityDto>>.Success(new List<DoctorAvailabilityDto>());
@@ -277,65 +284,93 @@ public class AppointmentServices : IAppointmentServices
           .OrderBy(a => a.LocalStartTime)
           .ToList();
       var appointmentsToday = localAppointments.Where(a => a.LocalStartTime.Date == localToday).ToList();
-      bool isBusyNow = appointmentsToday.Any(a => a.LocalStartTime <= localNow && a.LocalEndTime > localNow);
+      var busyNow = appointmentsToday.Any(a => a.LocalStartTime <= localNow && a.LocalEndTime > localNow);
+      var hasEmployeeSchedule = item.Doctor.EmployeeSchedules.Count > 0;
+      var appointmentDuration = item.Doctor.AppointmentDurationMinutes is >= 5 and <= 150
+          ? item.Doctor.AppointmentDurationMinutes
+          : 30;
 
-      int occupiedSlots = 0;
-      foreach (var apt in appointmentsToday)
+      List<DateTime> FindAvailableSlots(DateTime date)
       {
-        var effectiveStart = apt.LocalStartTime.TimeOfDay < startToday ? startToday : apt.LocalStartTime.TimeOfDay;
-        var effectiveEnd = apt.LocalEndTime.TimeOfDay > endToday ? endToday : apt.LocalEndTime.TimeOfDay;
+        if (!clinicSchedules.TryGetValue((short)date.DayOfWeek, out var clinicSchedule) || !clinicSchedule.IsOpen)
+          return new List<DateTime>();
 
-        if (effectiveEnd > effectiveStart)
+        var employeeSchedule = item.Doctor.EmployeeSchedules
+            .FirstOrDefault(s => s.DayOfWeek == (short)date.DayOfWeek);
+        if (hasEmployeeSchedule && (employeeSchedule == null || !employeeSchedule.IsAvailable))
+          return new List<DateTime>();
+
+        var opening = employeeSchedule != null && hasEmployeeSchedule && employeeSchedule.StartTime > clinicSchedule.OpenTime
+            ? employeeSchedule.StartTime
+            : clinicSchedule.OpenTime;
+        var closing = employeeSchedule != null && hasEmployeeSchedule && employeeSchedule.EndTime < clinicSchedule.CloseTime
+            ? employeeSchedule.EndTime
+            : clinicSchedule.CloseTime;
+        if (closing <= opening)
+          return new List<DateTime>();
+
+        var candidate = DateTime.SpecifyKind(date.Date.Add(opening.ToTimeSpan()), DateTimeKind.Unspecified);
+        if (date.Date == localToday && candidate < localNow)
         {
-          var durationMinutes = (effectiveEnd - effectiveStart).TotalMinutes;
-          occupiedSlots += (int)Math.Ceiling(durationMinutes / 30.0);
+          var elapsedMinutes = (localNow - candidate).TotalMinutes;
+          var elapsedSlots = (int)Math.Ceiling(elapsedMinutes / appointmentDuration);
+          candidate = candidate.AddMinutes(elapsedSlots * appointmentDuration);
+        }
+
+        var endOfSchedule = DateTime.SpecifyKind(date.Date.Add(closing.ToTimeSpan()), DateTimeKind.Unspecified);
+        var dayAppointments = localAppointments.Where(a => a.LocalStartTime.Date == date.Date).ToList();
+        var availableSlots = new List<DateTime>();
+        while (candidate.AddMinutes(appointmentDuration) <= endOfSchedule)
+        {
+          var candidateEnd = candidate.AddMinutes(appointmentDuration);
+          var overlaps = dayAppointments.Any(a => a.LocalStartTime < candidateEnd && a.LocalEndTime > candidate);
+          if (!overlaps)
+            availableSlots.Add(candidate);
+          candidate = candidate.AddMinutes(appointmentDuration);
+        }
+
+        return availableSlots;
+      }
+
+      var availableSlotsToday = FindAvailableSlots(localToday);
+      var isWithinWorkingHoursNow = false;
+      if (clinicSchedules.TryGetValue((short)localToday.DayOfWeek, out var todayClinicSchedule) && todayClinicSchedule.IsOpen)
+      {
+        var todayEmployeeSchedule = item.Doctor.EmployeeSchedules
+            .FirstOrDefault(s => s.DayOfWeek == (short)localToday.DayOfWeek);
+        var doctorWorksToday = !hasEmployeeSchedule || todayEmployeeSchedule?.IsAvailable == true;
+        if (doctorWorksToday)
+        {
+          var opening = todayEmployeeSchedule != null && todayEmployeeSchedule.StartTime > todayClinicSchedule.OpenTime
+              ? todayEmployeeSchedule.StartTime
+              : todayClinicSchedule.OpenTime;
+          var closing = todayEmployeeSchedule != null && todayEmployeeSchedule.EndTime < todayClinicSchedule.CloseTime
+              ? todayEmployeeSchedule.EndTime
+              : todayClinicSchedule.CloseTime;
+          isWithinWorkingHoursNow = localNow.TimeOfDay >= opening.ToTimeSpan() && localNow.TimeOfDay < closing.ToTimeSpan();
         }
       }
-      int availableSlotsToday = Math.Max(0, totalSlotsToday - occupiedSlots);
-      var nextExistingAppt = localAppointments.FirstOrDefault(a => a.LocalStartTime > localNow);
+      DateTime? nextAvailableTime = availableSlotsToday.FirstOrDefault();
+      if (nextAvailableTime == default)
+        nextAvailableTime = null;
 
-      DateTime? nextTimeDisplay = null;
-      string textDisplay = "";
-
-      if (nextExistingAppt != null)
+      for (var dayOffset = 1; !nextAvailableTime.HasValue && dayOffset <= 30; dayOffset++)
       {
-        nextTimeDisplay = nextExistingAppt.LocalStartTime;
-        string timeStr = nextExistingAppt.LocalStartTime.ToString("hh:mm tt", esCulture).ToUpper();
-        if (nextExistingAppt.LocalStartTime.Date == localToday)
-        {
-          textDisplay = $"Ocupado hasta {timeStr}";
-        }
-        else if (nextExistingAppt.LocalStartTime.Date == localTomorrow)
-        {
-          textDisplay = $"Mañana {timeStr}";
-        }
-        else
-        {
-          textDisplay = nextExistingAppt.LocalStartTime.ToString("ddd dd MMM hh:mm tt", esCulture).ToUpper();
-        }
+        var candidateSlots = FindAvailableSlots(localToday.AddDays(dayOffset));
+        if (candidateSlots.Count > 0)
+          nextAvailableTime = candidateSlots[0];
+      }
+
+      string textDisplay;
+      if (nextAvailableTime.HasValue)
+      {
+        var slotDate = nextAvailableTime.Value.Date;
+        var dayLabel = slotDate == localToday ? "hoy" : slotDate == localTomorrow ? "mañana" : slotDate.ToString("ddd dd MMM", esCulture);
+        textDisplay = $"Disponible {dayLabel} a las {nextAvailableTime.Value.ToString("hh:mm tt", esCulture)}";
       }
       else
       {
-        if (availableSlotsToday > 0 && localNow.TimeOfDay < endToday)
-        {
-          textDisplay = "Disponible Ahora";
-          nextTimeDisplay = localNow;
-        }
-        else
-        {
-          var nextDay = localToday.AddDays(1);
-          var schedule = GetSchedule(nextDay);
-          while (schedule.totalSlots == 0)
-          {
-            nextDay = nextDay.AddDays(1);
-            schedule = GetSchedule(nextDay);
-          }
-
-          var nextOpenTime = nextDay.Add(schedule.start);
-          nextTimeDisplay = nextOpenTime;
-
-          textDisplay = nextDay == localTomorrow ? $"Mañana {schedule.start:hh\\:mm} {((schedule.start.Hours < 12) ? "AM" : "PM")}" : nextOpenTime.ToString("ddd hh:mm tt", esCulture).ToUpper();
-        }
+        textDisplay = "Sin horarios disponibles en los próximos 30 días";
       }
       var fullName = string.Join(" ", new[] { doctor.FirstName, doctor.MiddleName, doctor.LastName, doctor.SecondLastName }.Where(n => !string.IsNullOrWhiteSpace(n)));
       result.Add(new DoctorAvailabilityDto
@@ -343,17 +378,26 @@ public class AppointmentServices : IAppointmentServices
         DoctorId = doctor.Id,
         FullName = fullName,
         SpecialtyName = item.SpecialtyName ?? "General",
-        IsAvailable = !isBusyNow, // True si no está en una cita en este segundo
-        NextAppointmentTime = nextTimeDisplay,
+        IsAvailable = isWithinWorkingHoursNow && !busyNow,
+        NextAppointmentTime = nextAvailableTime,
         NextAppointmentDisplay = textDisplay,
-        AvailableSlotsToday = availableSlotsToday,
-        AppointmentsTodayCount = appointmentsToday.Count
+        AvailableSlotsToday = availableSlotsToday.Count,
+        AppointmentsTodayCount = appointmentsToday.Count,
+        AppointmentDurationMinutes = appointmentDuration
       });
     }
 
     return Result<List<DoctorAvailabilityDto>>.Success(
         result.OrderBy(d => d.FullName).ToList()
     );
+  }
+
+  private static string NormalizeDni(string? value)
+  {
+    return new string((value ?? string.Empty)
+        .Where(char.IsAsciiLetterOrDigit)
+        .Select(char.ToUpperInvariant)
+        .ToArray());
   }
 
   public async Task<Result<List<AppointmentListDto>>> GetListAsync(AppointmentFilterDto filter)
@@ -555,9 +599,15 @@ public class AppointmentServices : IAppointmentServices
         var startTimeUtc = TimeZoneInfo.ConvertTimeToUtc(incomingLocalTime, userTimeZone);
         var endTimeUtc = startTimeUtc.AddMinutes(dto.Duration);
 
+        var patientHasOverlap = await _appointmentRepository.ExistAsync(a =>
+            a.PatientId == dto.PatientId && a.Id != dto.Id && a.StartTime < endTimeUtc &&
+            a.StartTime.AddMinutes(a.Duration) > startTimeUtc && a.StatusId != 5 && a.StatusId != 6);
+        if (patientHasOverlap)
+          return Result.Failure(new Error(ErrorCodes.BadRequest, "The patient already has an appointment at that time.", "StartTime"));
+
         var doctorHasOverlap = await _appointmentRepository.ExistAsync(a =>
             a.EmployeeId == dto.EmployeeId && a.StartTime < endTimeUtc &&
-            a.StartTime.AddMinutes(a.Duration) > startTimeUtc && a.Id != dto.Id && a.StatusId != 5);
+            a.StartTime.AddMinutes(a.Duration) > startTimeUtc && a.Id != dto.Id && a.StatusId != 5 && a.StatusId != 6);
         if (doctorHasOverlap)
           return Result.Failure(new Error(ErrorCodes.BadRequest, "The doctor already has an appointment at that time.", "StartTime"));
 

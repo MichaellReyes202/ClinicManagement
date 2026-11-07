@@ -14,13 +14,16 @@ namespace Application.Validators.Appointment
     public class AppointmentCreateDtoValidator : AbstractValidator<AppointmentCreateDto>
     {
         private readonly IGenericRepository<ClinicSchedule> _clinicScheduleRepo;
+        private readonly IGenericRepository<EmployeeSchedule> _employeeScheduleRepo;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
         public AppointmentCreateDtoValidator(
             IGenericRepository<ClinicSchedule> clinicScheduleRepo,
+            IGenericRepository<EmployeeSchedule> employeeScheduleRepo,
             IHttpContextAccessor httpContextAccessor)
         {
             _clinicScheduleRepo = clinicScheduleRepo;
+            _employeeScheduleRepo = employeeScheduleRepo;
             _httpContextAccessor = httpContextAccessor;
 
             RuleFor(x => x.PatientId)
@@ -49,6 +52,11 @@ namespace Application.Validators.Appointment
                 .MustAsync(BeWithinWorkingDayAsync)
                 .WithMessage("The appointment must start and end within the clinic's business hours on the same day.")
                 .OverridePropertyName("Duration");
+
+            RuleFor(x => x)
+                .MustAsync(BeWithinDoctorScheduleAsync)
+                .WithMessage("The appointment must fit within the doctor's availability.")
+                .OverridePropertyName("StartTime");
         }
 
         private bool NotBeInThePast(DateTime startTime)
@@ -95,6 +103,22 @@ namespace Application.Validators.Appointment
             var endTimeOnly = TimeOnly.FromDateTime(endTime);
 
             return startTimeOnly >= schedule.OpenTime && endTimeOnly <= schedule.CloseTime;
+        }
+
+        private async Task<bool> BeWithinDoctorScheduleAsync(AppointmentCreateDto dto, CancellationToken cancellationToken)
+        {
+            var query = await _employeeScheduleRepo.GetQuery(filter: s => s.EmployeeId == dto.EmployeeId);
+            var schedules = await query.ToListAsync(cancellationToken);
+            if (schedules.Count == 0)
+                return true; // Si aún no se configuraron horarios por médico, aplica el horario general de la clínica.
+
+            var daySchedule = schedules.FirstOrDefault(s => s.DayOfWeek == (short)dto.StartTime.DayOfWeek);
+            if (daySchedule == null || !daySchedule.IsAvailable)
+                return false;
+
+            var start = TimeOnly.FromDateTime(dto.StartTime);
+            var end = TimeOnly.FromDateTime(dto.StartTime.AddMinutes(dto.Duration));
+            return start >= daySchedule.StartTime && end <= daySchedule.EndTime;
         }
     }
 }

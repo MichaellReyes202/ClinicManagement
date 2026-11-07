@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 
 namespace Domain.Entities;
@@ -46,6 +46,8 @@ public partial class Patient
     public virtual ICollection<Appointment> Appointments { get; set; } = new List<Appointment>();
 
     public virtual CatBloodType? BloodType { get; set; }
+
+    public virtual ICollection<ChatClinicalEscalation> ChatClinicalEscalations { get; set; } = new List<ChatClinicalEscalation>();
 
     public virtual ICollection<Consultation> Consultations { get; set; } = new List<Consultation>();
 

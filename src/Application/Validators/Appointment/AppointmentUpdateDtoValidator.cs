@@ -1,8 +1,10 @@
 
 using Application.DTOs.Appointment;
+using Application.Util;
 using Domain.Entities;
 using Domain.Interfaces;
 using FluentValidation;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Threading;
@@ -12,10 +14,17 @@ namespace Application.Validators.Appointment;
 public class AppointmentUpdateDtoValidator : AbstractValidator<AppointmentUpdateDto>
 {
     private readonly IGenericRepository<ClinicSchedule> _clinicScheduleRepo;
+    private readonly IGenericRepository<EmployeeSchedule> _employeeScheduleRepo;
+    private readonly IHttpContextAccessor _httpContextAccessor;
 
-    public AppointmentUpdateDtoValidator(IGenericRepository<ClinicSchedule> clinicScheduleRepo)
+    public AppointmentUpdateDtoValidator(
+        IGenericRepository<ClinicSchedule> clinicScheduleRepo,
+        IGenericRepository<EmployeeSchedule> employeeScheduleRepo,
+        IHttpContextAccessor httpContextAccessor)
     {
         _clinicScheduleRepo = clinicScheduleRepo;
+        _employeeScheduleRepo = employeeScheduleRepo;
+        _httpContextAccessor = httpContextAccessor;
 
         // id de la cita
         RuleFor( x => x.Id ).NotNull().GreaterThan(0).WithMessage("appointment id is required");
@@ -30,18 +39,14 @@ public class AppointmentUpdateDtoValidator : AbstractValidator<AppointmentUpdate
         RuleFor(x => x.StartTime)
             .NotEmpty()
             .WithMessage("The start date and time are required.")
-            .GreaterThanOrEqualTo(x => DateTime.Now.AddMinutes(-10))
+            .Must(NotBeInThePast)
             .WithMessage("Appointments cannot be scheduled in the past.")
             .MustAsync(BeWithinClinicBusinessHoursAsync)
             .WithMessage("The start time must be within the clinic's business hours.");
 
         // Validación cruzada: cita termina >= 2 horas después de ahora
         RuleFor(x => x)
-            .Must(x =>
-            {
-                var endTime = x.StartTime.AddMinutes(x.Duration);
-                return endTime >= DateTime.Now.AddHours(2);
-            })
+            .Must(EndsAtLeastTwoHoursFromNow)
             .WithMessage("The appointment must end at least 2 hours after the current time.")
             .OverridePropertyName("StartTime");
 
@@ -49,6 +54,27 @@ public class AppointmentUpdateDtoValidator : AbstractValidator<AppointmentUpdate
             .MustAsync(BeWithinWorkingDayAsync)
             .WithMessage("The appointment must start and end within the clinic's business hours on the same day.")
             .OverridePropertyName("Duration");
+
+        RuleFor(x => x)
+            .MustAsync(BeWithinDoctorScheduleAsync)
+            .WithMessage("The appointment must fit within the doctor's availability.")
+            .OverridePropertyName("StartTime");
+    }
+
+    private bool NotBeInThePast(DateTime startTime)
+    {
+        var timeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+        var localCutoff = DateTime.SpecifyKind(localNow.AddMinutes(-10), DateTimeKind.Unspecified);
+        return DateTime.SpecifyKind(startTime, DateTimeKind.Unspecified) >= localCutoff;
+    }
+
+    private bool EndsAtLeastTwoHoursFromNow(AppointmentUpdateDto dto)
+    {
+        var timeZone = GetTimeZone.GetRequestTimeZone(_httpContextAccessor);
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+        var localStart = DateTime.SpecifyKind(dto.StartTime, DateTimeKind.Unspecified);
+        return localStart.AddMinutes(dto.Duration) >= DateTime.SpecifyKind(localNow.AddHours(2), DateTimeKind.Unspecified);
     }
 
     private async Task<bool> BeWithinClinicBusinessHoursAsync(DateTime startTime, CancellationToken cancellationToken)
@@ -86,5 +112,21 @@ public class AppointmentUpdateDtoValidator : AbstractValidator<AppointmentUpdate
         var endTimeOnly = TimeOnly.FromDateTime(endTime);
 
         return startTimeOnly >= schedule.OpenTime && endTimeOnly <= schedule.CloseTime;
+    }
+
+    private async Task<bool> BeWithinDoctorScheduleAsync(AppointmentUpdateDto dto, CancellationToken cancellationToken)
+    {
+        var query = await _employeeScheduleRepo.GetQuery(filter: s => s.EmployeeId == dto.EmployeeId);
+        var schedules = await query.ToListAsync(cancellationToken);
+        if (schedules.Count == 0)
+            return true; // Si aún no se configuraron horarios por médico, aplica el horario general de la clínica.
+
+        var daySchedule = schedules.FirstOrDefault(s => s.DayOfWeek == (short)dto.StartTime.DayOfWeek);
+        if (daySchedule == null || !daySchedule.IsAvailable)
+            return false;
+
+        var start = TimeOnly.FromDateTime(dto.StartTime);
+        var end = TimeOnly.FromDateTime(dto.StartTime.AddMinutes(dto.Duration));
+        return start >= daySchedule.StartTime && end <= daySchedule.EndTime;
     }
 }

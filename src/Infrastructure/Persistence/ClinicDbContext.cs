@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -15,10 +15,6 @@ public partial class ClinicDbContext : DbContext
     public virtual DbSet<Appointment> Appointments { get; set; }
 
     public virtual DbSet<AppointmentReminder> AppointmentReminders { get; set; }
-
-    public virtual DbSet<ChatClinicalEscalation> ChatClinicalEscalations { get; set; }
-
-    public virtual DbSet<ChatAppointmentEscalation> ChatAppointmentEscalations { get; set; }
 
     public virtual DbSet<Auditlog> Auditlogs { get; set; }
 
@@ -39,6 +35,10 @@ public partial class ClinicDbContext : DbContext
     public virtual DbSet<CatSexo> CatSexos { get; set; }
 
     public virtual DbSet<CatView> CatViews { get; set; }
+
+    public virtual DbSet<ChatAppointmentEscalation> ChatAppointmentEscalations { get; set; }
+
+    public virtual DbSet<ChatClinicalEscalation> ChatClinicalEscalations { get; set; }
 
     public virtual DbSet<ChatConversation> ChatConversations { get; set; }
 
@@ -154,62 +154,31 @@ public partial class ClinicDbContext : DbContext
 
         modelBuilder.Entity<AppointmentReminder>(entity =>
         {
+            entity.HasKey(e => e.Id).HasName("appointment_reminders_pkey");
+
             entity.ToTable("appointment_reminders");
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => e.AppointmentId).IsUnique();
+
+            entity.HasIndex(e => e.AppointmentId, "appointment_reminders_appointment_id_key").IsUnique();
+
+            entity.HasIndex(e => e.ScheduledAtUtc, "idx_appointment_reminders_due").HasFilter("(sent_at_utc IS NULL)");
+
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.AppointmentId).HasColumnName("appointment_id");
+            entity.Property(e => e.Attempts)
+                .HasDefaultValue(0)
+                .HasColumnName("attempts");
+            entity.Property(e => e.CreatedAtUtc)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at_utc");
+            entity.Property(e => e.LastError)
+                .HasMaxLength(500)
+                .HasColumnName("last_error");
             entity.Property(e => e.ScheduledAtUtc).HasColumnName("scheduled_at_utc");
             entity.Property(e => e.SentAtUtc).HasColumnName("sent_at_utc");
-            entity.Property(e => e.Attempts).HasColumnName("attempts").HasDefaultValue(0);
-            entity.Property(e => e.LastError).HasMaxLength(500).HasColumnName("last_error");
-            entity.Property(e => e.CreatedAtUtc).HasColumnName("created_at_utc").HasDefaultValueSql("now()");
-            entity.HasOne(e => e.Appointment).WithOne(e => e.Reminder)
-                .HasForeignKey<AppointmentReminder>(e => e.AppointmentId)
-                .OnDelete(DeleteBehavior.Cascade);
-        });
 
-        modelBuilder.Entity<ChatClinicalEscalation>(entity =>
-        {
-            entity.ToTable("chat_clinical_escalations");
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.Status, e.CreatedAtUtc });
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.ConversationId).HasColumnName("conversation_id");
-            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
-            entity.Property(e => e.PatientId).HasColumnName("patient_id");
-            entity.Property(e => e.Summary).HasMaxLength(1000).HasColumnName("summary");
-            entity.Property(e => e.Urgency).HasMaxLength(20).HasColumnName("urgency").HasDefaultValue("normal");
-            entity.Property(e => e.Status).HasMaxLength(20).HasColumnName("status").HasDefaultValue("pending");
-            entity.Property(e => e.CreatedAtUtc).HasColumnName("created_at_utc").HasDefaultValueSql("now()");
-            entity.Property(e => e.ResolvedAtUtc).HasColumnName("resolved_at_utc");
-            entity.HasOne(e => e.Conversation).WithMany(e => e.ClinicalEscalations)
-                .HasForeignKey(e => e.ConversationId).OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne(e => e.CreatedByUser).WithMany()
-                .HasForeignKey(e => e.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.Patient).WithMany()
-                .HasForeignKey(e => e.PatientId).OnDelete(DeleteBehavior.SetNull);
-        });
-
-        modelBuilder.Entity<ChatAppointmentEscalation>(entity =>
-        {
-            entity.ToTable("chat_appointment_escalations");
-            entity.HasKey(e => e.Id);
-            entity.HasIndex(e => new { e.Status, e.CreatedAtUtc });
-            entity.Property(e => e.Id).HasColumnName("id");
-            entity.Property(e => e.ConversationId).HasColumnName("conversation_id");
-            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
-            entity.Property(e => e.AppointmentId).HasColumnName("appointment_id");
-            entity.Property(e => e.Summary).HasMaxLength(1000).HasColumnName("summary");
-            entity.Property(e => e.Status).HasMaxLength(20).HasColumnName("status").HasDefaultValue("pending");
-            entity.Property(e => e.CreatedAtUtc).HasColumnName("created_at_utc").HasDefaultValueSql("now()");
-            entity.Property(e => e.ResolvedAtUtc).HasColumnName("resolved_at_utc");
-            entity.HasOne(e => e.Conversation).WithMany(e => e.AppointmentEscalations)
-                .HasForeignKey(e => e.ConversationId).OnDelete(DeleteBehavior.SetNull);
-            entity.HasOne(e => e.CreatedByUser).WithMany()
-                .HasForeignKey(e => e.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(e => e.Appointment).WithMany()
-                .HasForeignKey(e => e.AppointmentId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(d => d.Appointment).WithOne(p => p.AppointmentReminder)
+                .HasForeignKey<AppointmentReminder>(d => d.AppointmentId)
+                .HasConstraintName("appointment_reminders_appointment_id_fkey");
         });
 
         modelBuilder.Entity<Auditlog>(entity =>
@@ -394,6 +363,90 @@ public partial class ClinicDbContext : DbContext
             entity.Property(e => e.Route)
                 .HasMaxLength(255)
                 .HasColumnName("route");
+        });
+
+        modelBuilder.Entity<ChatAppointmentEscalation>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("chat_appointment_escalations_pkey");
+
+            entity.ToTable("chat_appointment_escalations");
+
+            entity.HasIndex(e => new { e.Status, e.CreatedAtUtc }, "idx_chat_appointment_escalations_pending").IsDescending(false, true);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.AppointmentId).HasColumnName("appointment_id");
+            entity.Property(e => e.ConversationId).HasColumnName("conversation_id");
+            entity.Property(e => e.CreatedAtUtc)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at_utc");
+            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
+            entity.Property(e => e.ResolvedAtUtc).HasColumnName("resolved_at_utc");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'pending'::character varying")
+                .HasColumnName("status");
+            entity.Property(e => e.Summary)
+                .HasMaxLength(1000)
+                .HasColumnName("summary");
+
+            entity.HasOne(d => d.Appointment).WithMany(p => p.ChatAppointmentEscalations)
+                .HasForeignKey(d => d.AppointmentId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("chat_appointment_escalations_appointment_id_fkey");
+
+            entity.HasOne(d => d.Conversation).WithMany(p => p.ChatAppointmentEscalations)
+                .HasForeignKey(d => d.ConversationId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("chat_appointment_escalations_conversation_id_fkey");
+
+            entity.HasOne(d => d.CreatedByUser).WithMany(p => p.ChatAppointmentEscalations)
+                .HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("chat_appointment_escalations_created_by_user_id_fkey");
+        });
+
+        modelBuilder.Entity<ChatClinicalEscalation>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("chat_clinical_escalations_pkey");
+
+            entity.ToTable("chat_clinical_escalations");
+
+            entity.HasIndex(e => new { e.Status, e.CreatedAtUtc }, "idx_chat_clinical_escalations_pending").IsDescending(false, true);
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.ConversationId).HasColumnName("conversation_id");
+            entity.Property(e => e.CreatedAtUtc)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("created_at_utc");
+            entity.Property(e => e.CreatedByUserId).HasColumnName("created_by_user_id");
+            entity.Property(e => e.PatientId).HasColumnName("patient_id");
+            entity.Property(e => e.ResolvedAtUtc).HasColumnName("resolved_at_utc");
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'pending'::character varying")
+                .HasColumnName("status");
+            entity.Property(e => e.Summary)
+                .HasMaxLength(1000)
+                .HasColumnName("summary");
+            entity.Property(e => e.Urgency)
+                .HasMaxLength(20)
+                .HasDefaultValueSql("'normal'::character varying")
+                .HasColumnName("urgency");
+
+            entity.HasOne(d => d.Conversation).WithMany(p => p.ChatClinicalEscalations)
+                .HasForeignKey(d => d.ConversationId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("chat_clinical_escalations_conversation_id_fkey");
+
+            entity.HasOne(d => d.CreatedByUser).WithMany(p => p.ChatClinicalEscalations)
+                .HasForeignKey(d => d.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict)
+                .HasConstraintName("chat_clinical_escalations_created_by_user_id_fkey");
+
+            entity.HasOne(d => d.Patient).WithMany(p => p.ChatClinicalEscalations)
+                .HasForeignKey(d => d.PatientId)
+                .OnDelete(DeleteBehavior.SetNull)
+                .HasConstraintName("chat_clinical_escalations_patient_id_fkey");
         });
 
         modelBuilder.Entity<ChatConversation>(entity =>

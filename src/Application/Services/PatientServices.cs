@@ -9,6 +9,7 @@ using Domain.Interfaces;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using System.Text.RegularExpressions;
 
 
 namespace Application.Services;
@@ -50,12 +51,28 @@ public class PatientServices : IPatientServices
 
     if (!string.IsNullOrEmpty(searchTerm))
     {
-      searchFilter = e =>
-          e.FirstName.ToLower().Contains(searchTerm) || // Solo el primer nombre
-          (e.MiddleName != null && e.MiddleName.ToLower().Contains(searchTerm)) || // Si existe, el segundo nombre
-           e.LastName.ToLower().Contains(searchTerm) || // Apellido
-           (e.SecondLastName != null && e.SecondLastName.ToLower().Contains(searchTerm)) ||
-           (e.Dni != null && e.Dni.ToLower().Contains(searchTerm));
+      var dniDigits = Regex.Replace(searchTerm, "[^a-z0-9]", string.Empty, RegexOptions.IgnoreCase);
+      bool isCompleteDni = Regex.IsMatch(
+          searchTerm,
+          @"^\d{3}[\s-]?\d{6}[\s-]?\d{4}[\s-]?[a-z]$",
+          RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+      if (isCompleteDni)
+      {
+        searchFilter = e => e.Dni != null &&
+            e.Dni.Replace("-", string.Empty)
+                .Replace(" ", string.Empty)
+                .ToLower() == dniDigits;
+      }
+      else
+      {
+        searchFilter = e =>
+            e.FirstName.ToLower().Contains(searchTerm) || // Solo el primer nombre
+            (e.MiddleName != null && e.MiddleName.ToLower().Contains(searchTerm)) || // Si existe, el segundo nombre
+             e.LastName.ToLower().Contains(searchTerm) || // Apellido
+             (e.SecondLastName != null && e.SecondLastName.ToLower().Contains(searchTerm)) ||
+             (e.Dni != null && e.Dni.ToLower().Contains(searchTerm));
+      }
     }
     var (baseQuery, total) = await _patientRepository.GetQueryAndTotal(filter: searchFilter);
     var projectQuery = baseQuery

@@ -15,4 +15,5 @@ public class DoctorAvailabilityDto
     public string NextAppointmentDisplay { get; set; } = null!;
     public int AvailableSlotsToday { get; set; }
     public int AppointmentsTodayCount { get; set; }
+    public int AppointmentDurationMinutes { get; set; }
 }
